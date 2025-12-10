@@ -1,3 +1,6 @@
 .venv/bin
 .venv
 .idea/
+__pycache__/
+data/
+data/raw/.ipynb_checkpoints/
