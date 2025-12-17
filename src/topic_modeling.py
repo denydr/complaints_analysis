@@ -317,6 +317,121 @@ def _train_gensim_lda(
 
     return lda, coherence
 
+def _select_best_k_by_coherence(
+    X_sparse,
+    vocab: list[str],
+    texts_tokens: list[list[str]],
+    k_min: int,
+    k_max: int,
+    passes: int,
+    iterations: int,
+    random_state: int,
+    out_csv: Path,
+    out_prefix: str,
+):
+    """
+    Sweep K (num_topics) and select the best model by c_v coherence.
+
+    This function is used to automatically choose the number of topics for LDA.
+    It is intentionally lightweight:
+    - trains temporary LDA models for each K
+    - computes c_v coherence
+    - saves a sweep table (CSV)
+    - returns the best K (highest coherence)
+
+    Parameters
+    ----------
+    X_sparse : scipy.sparse matrix
+        Document-term matrix (BoW or TF-IDF).
+    vocab : list[str]
+        Vocabulary aligned with columns of X_sparse.
+    texts_tokens : list[list[str]]
+        Tokenized documents (for coherence), aligned with X_sparse rows.
+    k_min : int
+        Minimum number of topics to try.
+    k_max : int
+        Maximum number of topics to try (inclusive).
+    passes : int
+        Passes for LDA training during sweep.
+    iterations : int
+        Iterations for LDA training during sweep.
+    random_state : int
+        Random seed for reproducibility.
+    out_csv : Path
+        Output CSV path for sweep results.
+    out_prefix : str
+        Prefix used only for logging clarity.
+
+    Returns
+    -------
+    tuple[int, pd.DataFrame]
+        (best_k, results_df)
+    """
+
+    if int(k_max) < int(k_min):
+        raise ValueError("k_max must be >= k_min")
+
+    from gensim.corpora import Dictionary
+
+    corpus = matutils.Sparse2Corpus(X_sparse, documents_columns=False)
+    id2word = dict(enumerate(vocab))
+
+    vocab_set = set(vocab)
+    texts_tokens_aligned = [[tok for tok in doc if tok in vocab_set] for doc in texts_tokens]
+    dictionary = Dictionary(texts_tokens_aligned)
+
+    rows = []
+    best_k = None
+    best_coh = -1.0
+
+    for k in range(int(k_min), int(k_max) + 1):
+        lda_tmp = LdaModel(
+            corpus=corpus,
+            id2word=id2word,
+            num_topics=int(k),
+            passes=int(passes),
+            iterations=int(iterations),
+            random_state=int(random_state),
+            eval_every=None,
+            alpha="auto",
+            eta="auto",
+            chunksize=100,
+        )
+
+        coherence_model = CoherenceModel(
+            model=lda_tmp,
+            texts=texts_tokens_aligned,
+            dictionary=dictionary,
+            coherence="c_v",
+        )
+        coh = float(coherence_model.get_coherence())
+
+        rows.append(
+            {
+                "out_prefix": out_prefix,
+                "k": int(k),
+                "coherence_c_v": coh,
+                "passes": int(passes),
+                "iterations": int(iterations),
+                "random_state": int(random_state),
+            }
+        )
+
+        if coh > best_coh:
+            best_coh = coh
+            best_k = int(k)
+
+    if best_k is None:
+        best_k = int(k_min)
+
+    results_df = pd.DataFrame(rows)
+    out_csv.parent.mkdir(parents=True, exist_ok=True)
+    results_df.to_csv(out_csv, index=False)
+
+    print(f"✅ {out_prefix}: best_k={best_k} (c_v={best_coh:.4f})")
+    print(f"   saved sweep results: {out_csv}")
+
+    return best_k, results_df
 
 # -------------------------
 # Main pipelines
@@ -325,20 +440,35 @@ def run_lda_pipelines(
     num_topics: int = 5,
     passes: int = 30,
     iterations: int = 250,
+    auto_k: bool = True,
+    k_min: int = 3,
+    k_max: int = 10,
 ) -> None:
     """
     Train and compare two LDA models:
     1) LDA trained on BoW matrix
     2) LDA trained on TF-IDF matrix (comparison run)
 
+    By default, the pipeline automatically selects the number of topics (K)
+    separately for BoW and TF-IDF by sweeping a K range and choosing the
+    highest c_v coherence.
+
     Parameters
     ----------
     num_topics : int, default=5
-        Number of topics to learn for each model.
+        Fallback number of topics (used only when auto_k=False).
     passes : int, default=30
         Number of passes through the corpus.
     iterations : int, default=250
-        Number of iterations per pass.
+        Maximum number of iterations per pass.
+    auto_k : bool, default=True
+        If True, sweep K in [k_min, k_max] and select the best K by c_v coherence
+        separately for BoW and TF-IDF.
+        If False, train both models with num_topics.
+    k_min : int, default=3
+        Minimum number of topics (inclusive) to try when auto_k=True.
+    k_max : int, default=10
+        Maximum number of topics (inclusive) to try when auto_k=True.
 
     Returns
     -------
@@ -360,11 +490,49 @@ def run_lda_pipelines(
         )
     texts_tokens = [t.split() for t in texts]
 
+    # -------------------------
+    # Auto-select K (topics)
+    # -------------------------
+    if auto_k:
+        best_k_bow, _ = _select_best_k_by_coherence(
+            X_sparse=X_bow,
+            vocab=bow_vocab,
+            texts_tokens=texts_tokens,
+            k_min=k_min,
+            k_max=k_max,
+            passes=passes,
+            iterations=iterations,
+            random_state=LDA_RANDOM_STATE,
+            out_csv=LDA_TOPIC_DIR / "lda_bow_k_sweep.csv",
+            out_prefix="lda_bow",
+        )
+
+        best_k_tfidf, _ = _select_best_k_by_coherence(
+            X_sparse=X_tfidf,
+            vocab=tfidf_vocab,
+            texts_tokens=texts_tokens,
+            k_min=k_min,
+            k_max=k_max,
+            passes=passes,
+            iterations=iterations,
+            random_state=LDA_RANDOM_STATE,
+            out_csv=LDA_TOPIC_DIR / "lda_tfidf_k_sweep.csv",
+            out_prefix="lda_tfidf",
+        )
+    else:
+        best_k_bow = int(num_topics)
+        best_k_tfidf = int(num_topics)
+
+    print(f"Selected K: BoW={best_k_bow}, TF-IDF={best_k_tfidf}")
+
+    # -------------------------
+    # Train final models (save artifacts)
+    # -------------------------
     _, coh_bow = _train_gensim_lda(
         X_sparse=X_bow,
         vocab=bow_vocab,
         texts_tokens=texts_tokens,
-        num_topics=num_topics,
+        num_topics=best_k_bow,
         passes=passes,
         iterations=iterations,
         random_state=LDA_RANDOM_STATE,
@@ -376,7 +544,7 @@ def run_lda_pipelines(
         X_sparse=X_tfidf,
         vocab=tfidf_vocab,
         texts_tokens=texts_tokens,
-        num_topics=num_topics,
+        num_topics=best_k_tfidf,
         passes=passes,
         iterations=iterations,
         random_state=LDA_RANDOM_STATE,
@@ -487,7 +655,6 @@ def run_bertopic_pipeline(
         umap_model=umap_model,
         hdbscan_model=hdbscan_model,
         vectorizer_model=vectorizer_model,
-        min_topic_size=min_topic_size,
         nr_topics=nr_topics,
         calculate_probabilities=False,
         verbose=True,
@@ -531,7 +698,7 @@ if __name__ == "__main__":
         args.bertopic = True
 
     if args.lda:
-        run_lda_pipelines(num_topics=5, passes=30, iterations=250)
+        run_lda_pipelines(passes=30, iterations=250, auto_k=True)
 
     if args.bertopic:
         run_bertopic_pipeline(min_topic_size=40, n_neighbors=30, min_samples=1, nr_topics=None)
