@@ -24,6 +24,8 @@ import pandas as pd
 import joblib
 import numpy as np
 from scipy.sparse import load_npz
+from gensim.models import LdaModel
+from bertopic import BERTopic
 from src.config import (
     RAW_COMPLAINTS_FILE,
     CLEANED_COMPLAINTS_FILE,
@@ -33,6 +35,21 @@ from src.config import (
     LDA_TFIDF_FEATURE_NAMES_FILE,
     LDA_DOC_IDS_FILE,
     LDA_PROCESSED_TEXT_FILE,
+    # LDA topic model artifact paths
+    LDA_BOW_MODEL_FILE,
+    LDA_BOW_TOPICS_FILE,
+    LDA_BOW_DOC_TOPICS_FILE,
+    LDA_BOW_INFO_FILE,
+    LDA_BOW_K_SWEEP_FILE,
+    LDA_TFIDF_MODEL_FILE,
+    LDA_TFIDF_TOPICS_FILE,
+    LDA_TFIDF_DOC_TOPICS_FILE,
+    LDA_TFIDF_INFO_FILE,
+    LDA_TFIDF_K_SWEEP_FILE,
+    # BERTopic artifact paths
+    BERTOPIC_MODEL_FILE,
+    BERTOPIC_TOPIC_INFO_FILE,
+    BERTOPIC_DOC_TOPICS_FILE,
 )
 
 def load_raw_complaints(path: Optional[Path] = None) -> pd.DataFrame:
@@ -306,6 +323,275 @@ def load_lda_tfidf():
     """
     artifacts = load_lda_vectorized_artifacts()
     return artifacts["X_tfidf"], artifacts["tfidf_vocab"], artifacts["doc_ids"]
+
+
+# =======================
+# LDA Topic Model Loaders
+# =======================
+
+def load_lda_bow_model():
+    """
+    Load the trained BoW LDA model.
+
+    Returns
+    -------
+    gensim.models.LdaModel
+        Trained LDA model for BoW vectorization.
+
+    Raises
+    ------
+    FileNotFoundError
+        If model file is missing.
+    """
+    if not LDA_BOW_MODEL_FILE.exists():
+        raise FileNotFoundError(f"Missing BoW LDA model at: {LDA_BOW_MODEL_FILE}")
+
+    return LdaModel.load(str(LDA_BOW_MODEL_FILE))
+
+
+def load_lda_bow_topics():
+    """
+    Load BoW LDA topic-word distributions.
+
+    Returns
+    -------
+    pd.DataFrame
+        Topic-word distributions with columns: topic_id, word, probability.
+
+    Raises
+    ------
+    FileNotFoundError
+        If topics CSV is missing.
+    """
+    if not LDA_BOW_TOPICS_FILE.exists():
+        raise FileNotFoundError(f"Missing BoW topics CSV at: {LDA_BOW_TOPICS_FILE}")
+
+    return pd.read_csv(LDA_BOW_TOPICS_FILE)
+
+
+def load_lda_bow_doc_topics():
+    """
+    Load BoW LDA document-topic distributions.
+
+    Returns
+    -------
+    pd.DataFrame
+        Document-topic distributions with topic probabilities per document.
+
+    Raises
+    ------
+    FileNotFoundError
+        If doc-topics CSV is missing.
+    """
+    if not LDA_BOW_DOC_TOPICS_FILE.exists():
+        raise FileNotFoundError(f"Missing BoW doc-topics CSV at: {LDA_BOW_DOC_TOPICS_FILE}")
+
+    return pd.read_csv(LDA_BOW_DOC_TOPICS_FILE)
+
+
+def load_lda_bow_info():
+    """
+    Load BoW LDA model metadata.
+
+    Returns
+    -------
+    dict
+        Metadata including coherence, num_topics, n_docs, etc.
+
+    Raises
+    ------
+    FileNotFoundError
+        If info file is missing.
+    """
+    if not LDA_BOW_INFO_FILE.exists():
+        raise FileNotFoundError(f"Missing BoW info file at: {LDA_BOW_INFO_FILE}")
+
+    return joblib.load(LDA_BOW_INFO_FILE)
+
+
+def load_lda_bow_k_sweep():
+    """
+    Load BoW LDA grid search results.
+
+    Returns
+    -------
+    pd.DataFrame
+        K-sweep results with columns: k, coherence, perplexity.
+
+    Raises
+    ------
+    FileNotFoundError
+        If K-sweep CSV is missing.
+    """
+    if not LDA_BOW_K_SWEEP_FILE.exists():
+        raise FileNotFoundError(f"Missing BoW K-sweep CSV at: {LDA_BOW_K_SWEEP_FILE}")
+
+    return pd.read_csv(LDA_BOW_K_SWEEP_FILE)
+
+
+def load_lda_tfidf_model():
+    """
+    Load the trained TF-IDF LDA model.
+
+    Returns
+    -------
+    gensim.models.LdaModel
+        Trained LDA model for TF-IDF vectorization.
+
+    Raises
+    ------
+    FileNotFoundError
+        If model file is missing.
+    """
+    if not LDA_TFIDF_MODEL_FILE.exists():
+        raise FileNotFoundError(f"Missing TF-IDF LDA model at: {LDA_TFIDF_MODEL_FILE}")
+
+    return LdaModel.load(str(LDA_TFIDF_MODEL_FILE))
+
+
+def load_lda_tfidf_topics():
+    """
+    Load TF-IDF LDA topic-word distributions.
+
+    Returns
+    -------
+    pd.DataFrame
+        Topic-word distributions with columns: topic_id, word, probability.
+
+    Raises
+    ------
+    FileNotFoundError
+        If topics CSV is missing.
+    """
+    if not LDA_TFIDF_TOPICS_FILE.exists():
+        raise FileNotFoundError(f"Missing TF-IDF topics CSV at: {LDA_TFIDF_TOPICS_FILE}")
+
+    return pd.read_csv(LDA_TFIDF_TOPICS_FILE)
+
+
+def load_lda_tfidf_doc_topics():
+    """
+    Load TF-IDF LDA document-topic distributions.
+
+    Returns
+    -------
+    pd.DataFrame
+        Document-topic distributions with topic probabilities per document.
+
+    Raises
+    ------
+    FileNotFoundError
+        If doc-topics CSV is missing.
+    """
+    if not LDA_TFIDF_DOC_TOPICS_FILE.exists():
+        raise FileNotFoundError(f"Missing TF-IDF doc-topics CSV at: {LDA_TFIDF_DOC_TOPICS_FILE}")
+
+    return pd.read_csv(LDA_TFIDF_DOC_TOPICS_FILE)
+
+
+def load_lda_tfidf_info():
+    """
+    Load TF-IDF LDA model metadata.
+
+    Returns
+    -------
+    dict
+        Metadata including coherence, num_topics, n_docs, etc.
+
+    Raises
+    ------
+    FileNotFoundError
+        If info file is missing.
+    """
+    if not LDA_TFIDF_INFO_FILE.exists():
+        raise FileNotFoundError(f"Missing TF-IDF info file at: {LDA_TFIDF_INFO_FILE}")
+
+    return joblib.load(LDA_TFIDF_INFO_FILE)
+
+
+def load_lda_tfidf_k_sweep():
+    """
+    Load TF-IDF LDA grid search results.
+
+    Returns
+    -------
+    pd.DataFrame
+        K-sweep results with columns: k, coherence, perplexity.
+
+    Raises
+    ------
+    FileNotFoundError
+        If K-sweep CSV is missing.
+    """
+    if not LDA_TFIDF_K_SWEEP_FILE.exists():
+        raise FileNotFoundError(f"Missing TF-IDF K-sweep CSV at: {LDA_TFIDF_K_SWEEP_FILE}")
+
+    return pd.read_csv(LDA_TFIDF_K_SWEEP_FILE)
+
+
+# =======================
+# BERTopic Model Loaders
+# =======================
+
+def load_bertopic_model():
+    """
+    Load the trained BERTopic model.
+
+    Returns
+    -------
+    BERTopic
+        Trained BERTopic model.
+
+    Raises
+    ------
+    FileNotFoundError
+        If model file is missing.
+    """
+    if not BERTOPIC_MODEL_FILE.exists():
+        raise FileNotFoundError(f"Missing BERTopic model at: {BERTOPIC_MODEL_FILE}")
+
+    return BERTopic.load(str(BERTOPIC_MODEL_FILE))
+
+
+def load_bertopic_topic_info():
+    """
+    Load BERTopic topic information table.
+
+    Returns
+    -------
+    pd.DataFrame
+        Topic info with columns: Topic, Count, Name, Representation, Representative_Docs.
+
+    Raises
+    ------
+    FileNotFoundError
+        If topic info CSV is missing.
+    """
+    if not BERTOPIC_TOPIC_INFO_FILE.exists():
+        raise FileNotFoundError(f"Missing BERTopic topic info CSV at: {BERTOPIC_TOPIC_INFO_FILE}")
+
+    return pd.read_csv(BERTOPIC_TOPIC_INFO_FILE)
+
+
+def load_bertopic_doc_topics():
+    """
+    Load BERTopic document-topic assignments.
+
+    Returns
+    -------
+    pd.DataFrame
+        Document-topic assignments with doc IDs and assigned topics.
+
+    Raises
+    ------
+    FileNotFoundError
+        If doc-topics CSV is missing.
+    """
+    if not BERTOPIC_DOC_TOPICS_FILE.exists():
+        raise FileNotFoundError(f"Missing BERTopic doc-topics CSV at: {BERTOPIC_DOC_TOPICS_FILE}")
+
+    return pd.read_csv(BERTOPIC_DOC_TOPICS_FILE)
+
 
 if __name__ == "__main__":
     # Quick manual tests: run `python -m src.data_loader` from project root

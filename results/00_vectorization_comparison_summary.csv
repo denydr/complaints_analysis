@@ -1,0 +1,6 @@
+Metric,BoW,TF-IDF
+Coherence (c_v),0.7763,0.7820
+Optimal K,5,7
+Total Documents,918,918
+Balance (CV),0.70,1.42
+Interpretation,Better balance,Higher imbalance

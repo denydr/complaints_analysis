@@ -84,6 +84,58 @@ LDA_TOPIC_DIR = TOPIC_MODELS_DIR / "lda"
 BERTOPIC_TOPIC_DIR = TOPIC_MODELS_DIR / "bertopic"
 
 # =======================
+# Topic Model Artifact Paths
+# =======================
+
+# LDA BoW (Bag-of-Words) model artifacts
+# Trained Gensim LDA model for BoW vectorization
+# Loaded with gensim.models.LdaModel.load()
+LDA_BOW_MODEL_FILE = LDA_TOPIC_DIR / "lda_bow_model.gensim"
+
+# Topic-word distributions for BoW LDA
+# CSV with columns: topic_id, word, probability
+LDA_BOW_TOPICS_FILE = LDA_TOPIC_DIR / "lda_bow_topics.csv"
+
+# Document-topic distributions for BoW LDA
+# CSV with columns: doc_id, topic_0, topic_1, ..., topic_K, dominant_topic
+LDA_BOW_DOC_TOPICS_FILE = LDA_TOPIC_DIR / "lda_bow_doc_topic_distributions.csv"
+
+# Model metadata for BoW LDA (coherence, num_topics, etc.)
+# Dictionary stored with joblib.dump()
+LDA_BOW_INFO_FILE = LDA_TOPIC_DIR / "lda_bow_info.joblib"
+
+# Grid search results for BoW LDA K selection
+# CSV with columns: k, coherence, perplexity
+LDA_BOW_K_SWEEP_FILE = LDA_TOPIC_DIR / "lda_bow_k_sweep.csv"
+
+# LDA TF-IDF model artifacts (same structure as BoW)
+LDA_TFIDF_MODEL_FILE = LDA_TOPIC_DIR / "lda_tfidf_model.gensim"
+LDA_TFIDF_TOPICS_FILE = LDA_TOPIC_DIR / "lda_tfidf_topics.csv"
+LDA_TFIDF_DOC_TOPICS_FILE = LDA_TOPIC_DIR / "lda_tfidf_doc_topic_distributions.csv"
+LDA_TFIDF_INFO_FILE = LDA_TOPIC_DIR / "lda_tfidf_info.joblib"
+LDA_TFIDF_K_SWEEP_FILE = LDA_TOPIC_DIR / "lda_tfidf_k_sweep.csv"
+
+# BERTopic model artifacts
+# Trained BERTopic model saved with .save()
+# Loaded with BERTopic.load()
+BERTOPIC_MODEL_FILE = BERTOPIC_TOPIC_DIR / "bertopic_model"
+
+# Topic information table for BERTopic
+# CSV with columns: Topic, Count, Name, Representation, Representative_Docs
+BERTOPIC_TOPIC_INFO_FILE = BERTOPIC_TOPIC_DIR / "bertopic_topic_info.csv"
+
+# Document-topic assignments for BERTopic
+# CSV with columns: doc_id, topic, topic_name
+BERTOPIC_DOC_TOPICS_FILE = BERTOPIC_TOPIC_DIR / "bertopic_doc_topics.csv"
+
+# =======================
+# Visualization Output Directory
+# =======================
+
+# Base directory for all visualization outputs and analysis results
+RESULTS_DIR = PROJECT_ROOT / "results"
+
+# =======================
 # Topic Modeling Settings
 # =======================
 
@@ -111,3 +163,4 @@ LDA_VECTORIZED_DIR.mkdir(parents=True, exist_ok=True)
 TOPIC_MODELS_DIR.mkdir(parents=True, exist_ok=True)
 LDA_TOPIC_DIR.mkdir(parents=True, exist_ok=True)
 BERTOPIC_TOPIC_DIR.mkdir(parents=True, exist_ok=True)
+RESULTS_DIR.mkdir(parents=True, exist_ok=True)

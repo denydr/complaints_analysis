@@ -1,10 +1,21 @@
 jupyter==1.0.*
 jupyterlab>=3.0.0
+
+# Data manipulation and numerical computing
 pandas
 numpy
 scipy
+
+# Machine learning
 scikit-learn
 joblib
+
+# Visualization
+matplotlib
+seaborn
+pyLDAvis
+
+# NLP and topic modeling
 spacy>=3.7,<3.8
 # German spaCy model
 de-core-news-sm @ https://github.com/explosion/spacy-models/releases/download/de_core_news_sm-3.7.0/de_core_news_sm-3.7.0.tar.gz

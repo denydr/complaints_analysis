@@ -1,0 +1,9 @@
+Topic_ID,Topic_Name,Doc_Count,Percentage,Top_Words,Is_Predominant,Is_Outlier
+-1,-1_defekt_brunnen_beschädigt_straßenlaterne,162,17.5%,"defekt, brunnen, beschädigt, straßenlaterne, ausgefallen, platz, leuchtmittel, defekt lampenglas, lampenglas, hängeleuchte",False,True
+0,0_ausgefallen_leuchte_hausnummer_ecke,241,26.0%,"ausgefallen, leuchte, hausnummer, ecke, defekt, leuchte ausgefallen, lampe, höhe, leuchten, ampel",True,False
+1,1_mast_lampe_leuchtet_fehlt,150,16.2%,"mast, lampe, leuchtet, fehlt, mastnummer, ausgefallen, laterne, leuchte, licht, defekt",False,False
+2,2_ausgefallen_beleuchtung_röhre_ausgefallen beleuchtung,116,12.5%,"ausgefallen, beleuchtung, röhre, ausgefallen beleuchtung, brunnen, laterne, grünstreifen, einseitig, sperrmüll, beleuchtung ausgefallen",False,False
+3,3_leuchte_leuchte ausgefallen_komplett dunkel_ausgefallen,88,9.5%,"leuchte, leuchte ausgefallen, komplett dunkel, ausgefallen, komplett, dunkel, ausgefallen leuchte, licht, leuchtet, leuchten",False,False
+4,4_spielplatz_kinder_park_mülleimer,72,7.8%,"spielplatz, kinder, park, mülleimer, brunnen, müll, liegen, platz, stehen, liegt",False,False
+5,5_verschmutzt_müll_verschmutzung_mülleimer,53,5.7%,"verschmutzt, müll, verschmutzung, mülleimer, beschädigt, etc, extrem, brunnen, foto, brunnen verschmutzt",False,False
+6,6_wasser_brunnen_läuft_laufen,44,4.8%,"wasser, brunnen, läuft, laufen, platz, kinder, grüßen, freundlichen grüßen, freundlichen, brunnen läuft",False,False
