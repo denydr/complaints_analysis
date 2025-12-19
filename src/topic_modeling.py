@@ -622,8 +622,24 @@ def run_bertopic_pipeline(
     # Stopwords are only for topic representation (c-TF-IDF), not embeddings
     nlp = spacy.load("de_core_news_sm")
     stopwords = list(nlp.Defaults.stop_words) + [
-        "bitte", "danke", "sehr", "geehrt", "freundlich", "grüße", "hallo",
-        "str", "straße", "strasse", "nr"  # common address artifacts
+        # Greetings
+        "bitte", "danke", "hallo",
+
+        # Closing formulas (base + inflected forms + spelling variants)
+        "freundlich", "freundlichen",
+        "grüße", "grüßen", "gruß", "gruss", "grussen", "grüssen", "gruesse",
+        "herzlich", "herzlichen",
+        "hochachtungsvoll",
+
+        # Formal salutations
+        "sehr", "geehrt", "geehrte", "geehrter", "geehrten",
+
+        # Common fillers & abbreviations
+        "etc", "usw",  # und so weiter
+        "mfg", "vg",   # mit freundlichen grüßen, viele grüße
+
+        # Address artifacts
+        "str", "straße", "strasse", "nr",
     ]
 
     vectorizer_model = CountVectorizer(
