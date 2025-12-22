@@ -608,7 +608,7 @@ def run_bertopic_pipeline(
         Persists artifacts under BERTOPIC_TOPIC_DIR:
         - bertopic_model/ (serialized BERTopic model)
         - bertopic_topic_info.csv (topic IDs, counts, representative terms)
-        - bertopic_doc_topics.csv (per-document topic assignments)  
+        - bertopic_doc_topics.csv (per-document topic assignments)
     """
 
     df = load_cleaned_for_bertopic(keep_id=True)

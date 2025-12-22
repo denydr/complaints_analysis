@@ -7,10 +7,17 @@ Central configuration module for defining:
 - Directory paths for raw, cleaned, and vectorized data
 - Standard file names for key datasets
 - Shared topic-modeling settings (random seeds, embedding model name)
+- LLM configuration for topic labeling
+- Language-specific output directories (German/English)
 
 No execution logic beyond creating directories.
 """
+import os
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # =======================
 # Project & Data Directories
@@ -80,8 +87,20 @@ TOPIC_MODELS_DIR = DATA_ROOT / "topic_models"
 # LDA outputs (models, topic tables, coherence logs, etc.)
 LDA_TOPIC_DIR = TOPIC_MODELS_DIR / "lda"
 
+# LDA language-specific subdirectories for LLM-labeled artifacts
+# German labeled directory: contains German topic artifacts with LLM-generated topic names
+LDA_TOPIC_DIR_DE = LDA_TOPIC_DIR / "german_labeled"
+# English labeled directory: contains English-translated topic artifacts with LLM-generated topic names
+LDA_TOPIC_DIR_EN = LDA_TOPIC_DIR / "english_labeled"
+
 # BERTopic outputs (saved model, topic info, doc-topic assignments)
 BERTOPIC_TOPIC_DIR = TOPIC_MODELS_DIR / "bertopic"
+
+# BERTopic language-specific subdirectories for LLM-labeled artifacts
+# German labeled directory: contains German topic artifacts with LLM-generated topic names
+BERTOPIC_TOPIC_DIR_DE = BERTOPIC_TOPIC_DIR / "german_labeled"
+# English labeled directory: contains English-translated topic artifacts with LLM-generated topic names
+BERTOPIC_TOPIC_DIR_EN = BERTOPIC_TOPIC_DIR / "english_labeled"
 
 # =======================
 # Topic Model Artifact Paths
@@ -135,6 +154,34 @@ BERTOPIC_DOC_TOPICS_FILE = BERTOPIC_TOPIC_DIR / "bertopic_doc_topics.csv"
 # Base directory for all visualization outputs and analysis results
 RESULTS_DIR = PROJECT_ROOT / "results"
 
+# Language-specific results subdirectories for visualizations with LLM-labeled topics
+# German labeled directory: visualizations with German LLM-generated topic names (files 05, 07, 09-14)
+RESULTS_DIR_DE = RESULTS_DIR / "german_labeled"
+# English labeled directory: visualizations with English LLM-generated topic names (files 05, 07, 09-14)
+RESULTS_DIR_EN = RESULTS_DIR / "english_labeled"
+
+# =======================
+# LLM Configuration for Topic Labeling
+# =======================
+
+# OpenAI API key for LLM-based topic labeling
+# Should be set as environment variable: export OPENAI_API_KEY="sk-..."
+# Falls back to empty string if not set (will raise error when attempting to use LLM features)
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+
+# LLM model to use for generating topic labels
+# gpt-4o-mini: Cost-effective model, suitable for topic labeling tasks
+# Alternative: "gpt-4o" for higher quality (but more expensive)
+LLM_MODEL = "gpt-4o-mini"
+
+# Number of top words to include in LLM prompts for topic labeling
+LLM_NUM_KEYWORDS = 10
+
+# Number of representative documents to include in LLM prompts for context
+# BERTopic: uses built-in representative documents
+# LDA: uses documents with highest topic probability
+LLM_NUM_REPRESENTATIVE_DOCS = 2
+
 # =======================
 # Topic Modeling Settings
 # =======================
@@ -164,3 +211,11 @@ TOPIC_MODELS_DIR.mkdir(parents=True, exist_ok=True)
 LDA_TOPIC_DIR.mkdir(parents=True, exist_ok=True)
 BERTOPIC_TOPIC_DIR.mkdir(parents=True, exist_ok=True)
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+
+# Language-specific subdirectories (created on demand when LLM labeling is enabled)
+LDA_TOPIC_DIR_DE.mkdir(parents=True, exist_ok=True)
+LDA_TOPIC_DIR_EN.mkdir(parents=True, exist_ok=True)
+BERTOPIC_TOPIC_DIR_DE.mkdir(parents=True, exist_ok=True)
+BERTOPIC_TOPIC_DIR_EN.mkdir(parents=True, exist_ok=True)
+RESULTS_DIR_DE.mkdir(parents=True, exist_ok=True)
+RESULTS_DIR_EN.mkdir(parents=True, exist_ok=True)

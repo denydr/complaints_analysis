@@ -24,3 +24,7 @@ bertopic
 sentence-transformers
 umap-learn
 hdbscan
+
+# LLM-generated topics
+openai
+python-dotenv

@@ -6,3 +6,6 @@ data/
 data/raw/.ipynb_checkpoints/
 notebooks/.ipynb_checkpoints/
 results/
+
+# Environment variables (contains secrets)
+.env

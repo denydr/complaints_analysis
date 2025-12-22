@@ -50,6 +50,11 @@ from src.config import (
     BERTOPIC_MODEL_FILE,
     BERTOPIC_TOPIC_INFO_FILE,
     BERTOPIC_DOC_TOPICS_FILE,
+    # Language-specific directories
+    LDA_TOPIC_DIR_DE,
+    LDA_TOPIC_DIR_EN,
+    BERTOPIC_TOPIC_DIR_DE,
+    BERTOPIC_TOPIC_DIR_EN,
 )
 
 def load_raw_complaints(path: Optional[Path] = None) -> pd.DataFrame:
@@ -591,6 +596,208 @@ def load_bertopic_doc_topics():
         raise FileNotFoundError(f"Missing BERTopic doc-topics CSV at: {BERTOPIC_DOC_TOPICS_FILE}")
 
     return pd.read_csv(BERTOPIC_DOC_TOPICS_FILE)
+
+
+# ============================================
+# Language-Specific Labeled Topic Loaders
+# ============================================
+
+def load_lda_labeled_topics(
+    model_type: str = 'bow',
+    language: str = 'de'
+) -> pd.DataFrame:
+    """
+    Load LDA topic-word table with LLM-generated topic names.
+
+    Parameters
+    ----------
+    model_type : str, default='bow'
+        Type of LDA model: 'bow' or 'tfidf'
+    language : str, default='de'
+        Language for topic names: 'de' (German) or 'en' (English)
+
+    Returns
+    -------
+    pd.DataFrame
+        Topic-word distributions with additional 'topic_name' column.
+        Columns: topic_id, word, weight, topic_name
+
+    Raises
+    ------
+    FileNotFoundError
+        If labeled topics CSV is missing.
+    ValueError
+        If invalid model_type or language is specified.
+    """
+    if model_type not in ['bow', 'tfidf']:
+        raise ValueError(f"model_type must be 'bow' or 'tfidf', got: {model_type}")
+
+    if language not in ['de', 'en']:
+        raise ValueError(f"language must be 'de' or 'en', got: {language}")
+
+    topic_dir = LDA_TOPIC_DIR_DE if language == 'de' else LDA_TOPIC_DIR_EN
+    suffix = '' if language == 'de' else '_en'
+    file_path = topic_dir / f"lda_{model_type}_topics_labeled{suffix}.csv"
+
+    if not file_path.exists():
+        raise FileNotFoundError(
+            f"Labeled LDA topics not found at: {file_path}\n"
+            f"Run topic modeling with use_llm_labels=True first."
+        )
+
+    return pd.read_csv(file_path)
+
+
+def load_lda_labeled_doc_topics(
+    model_type: str = 'bow',
+    language: str = 'de'
+) -> pd.DataFrame:
+    """
+    Load LDA document-topic distributions with topic names.
+
+    Parameters
+    ----------
+    model_type : str, default='bow'
+        Type of LDA model: 'bow' or 'tfidf'
+    language : str, default='de'
+        Language for topic names: 'de' (German) or 'en' (English)
+
+    Returns
+    -------
+    pd.DataFrame
+        Document-topic distributions with topic names.
+        Columns: doc_index, doc_id, topic_0...topic_K, dominant_topic, dominant_topic_name
+
+    Raises
+    ------
+    FileNotFoundError
+        If labeled doc-topics CSV is missing.
+    """
+    if model_type not in ['bow', 'tfidf']:
+        raise ValueError(f"model_type must be 'bow' or 'tfidf', got: {model_type}")
+
+    if language not in ['de', 'en']:
+        raise ValueError(f"language must be 'de' or 'en', got: {language}")
+
+    topic_dir = LDA_TOPIC_DIR_DE if language == 'de' else LDA_TOPIC_DIR_EN
+    suffix = '' if language == 'de' else '_en'
+    file_path = topic_dir / f"lda_{model_type}_doc_topics_labeled{suffix}.csv"
+
+    if not file_path.exists():
+        raise FileNotFoundError(
+            f"Labeled LDA doc-topics not found at: {file_path}\n"
+            f"Run topic modeling with use_llm_labels=True first."
+        )
+
+    return pd.read_csv(file_path)
+
+
+def load_bertopic_labeled_topics(language: str = 'de') -> pd.DataFrame:
+    """
+    Load BERTopic topic info with LLM-generated topic names.
+
+    Parameters
+    ----------
+    language : str, default='de'
+        Language for topic names: 'de' (German) or 'en' (English)
+
+    Returns
+    -------
+    pd.DataFrame
+        Topic info with LLM-generated names.
+        Columns: Topic, Count, Name (LLM-generated), Representation, etc.
+
+    Raises
+    ------
+    FileNotFoundError
+        If labeled topics CSV is missing.
+    ValueError
+        If invalid language is specified.
+    """
+    if language not in ['de', 'en']:
+        raise ValueError(f"language must be 'de' or 'en', got: {language}")
+
+    topic_dir = BERTOPIC_TOPIC_DIR_DE if language == 'de' else BERTOPIC_TOPIC_DIR_EN
+    suffix = '' if language == 'de' else '_en'
+    file_path = topic_dir / f"bertopic_topic_info_labeled{suffix}.csv"
+
+    if not file_path.exists():
+        raise FileNotFoundError(
+            f"Labeled BERTopic topics not found at: {file_path}\n"
+            f"Run topic modeling with use_llm_labels=True first."
+        )
+
+    return pd.read_csv(file_path)
+
+
+def load_bertopic_labeled_doc_topics(language: str = 'de') -> pd.DataFrame:
+    """
+    Load BERTopic document-topic assignments with topic names.
+
+    Parameters
+    ----------
+    language : str, default='de'
+        Language for topic names: 'de' (German) or 'en' (English)
+
+    Returns
+    -------
+    pd.DataFrame
+        Document-topic assignments with topic names.
+        Columns: doc_id, topic_id, topic_name, etc.
+
+    Raises
+    ------
+    FileNotFoundError
+        If labeled doc-topics CSV is missing.
+    """
+    if language not in ['de', 'en']:
+        raise ValueError(f"language must be 'de' or 'en', got: {language}")
+
+    topic_dir = BERTOPIC_TOPIC_DIR_DE if language == 'de' else BERTOPIC_TOPIC_DIR_EN
+    suffix = '' if language == 'de' else '_en'
+    file_path = topic_dir / f"bertopic_doc_topics_labeled{suffix}.csv"
+
+    if not file_path.exists():
+        raise FileNotFoundError(
+            f"Labeled BERTopic doc-topics not found at: {file_path}\n"
+            f"Run topic modeling with use_llm_labels=True first."
+        )
+
+    return pd.read_csv(file_path)
+
+
+def load_bertopic_model_labeled(language: str = 'de'):
+    """
+    Load trained BERTopic model from language-specific directory.
+
+    Parameters
+    ----------
+    language : str, default='de'
+        Language for model: 'de' (German) or 'en' (English)
+
+    Returns
+    -------
+    BERTopic
+        Trained BERTopic model with LLM-generated topic names.
+
+    Raises
+    ------
+    FileNotFoundError
+        If model is missing.
+    """
+    if language not in ['de', 'en']:
+        raise ValueError(f"language must be 'de' or 'en', got: {language}")
+
+    topic_dir = BERTOPIC_TOPIC_DIR_DE if language == 'de' else BERTOPIC_TOPIC_DIR_EN
+    model_path = topic_dir / "bertopic_model"
+
+    if not model_path.exists():
+        raise FileNotFoundError(
+            f"Labeled BERTopic model not found at: {model_path}\n"
+            f"Run topic modeling with use_llm_labels=True first."
+        )
+
+    return BERTopic.load(str(model_path))
 
 
 if __name__ == "__main__":

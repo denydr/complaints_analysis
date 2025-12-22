@@ -3,13 +3,60 @@ visualization.py
 ----------------
 
 Visualization pipeline for topic modeling results from LDA (BoW + TF-IDF) and BERTopic.
+Supports both unlabeled (keyword-based) and LLM-labeled (human-readable) topic names
+with bilingual output (German and English).
 
 This module implements three primary objectives:
 1. Compare BoW vs TF-IDF vectorization techniques
 2. Extract and visualize ALL predominant topics from LDA
 3. Extract and visualize ALL predominant topics from BERTopic
 
-All outputs are saved to the results/ directory.
+
+Outputs
+-------
+- **Standard visualizations** (saved to `results/`):
+    - Files 00-04, 06, 08: Always generated (comparison metrics, topic balance, etc.)
+    - Uses keyword-based topic names from model outputs
+
+- **LLM-labeled visualizations** (saved to language-specific subdirectories):
+    - `results/german/`: Files 05, 07, 09-14 with German LLM-generated topic names
+    - `results/english/`: Files 05, 07, 09-14 with English LLM-generated topic names
+    - Uses human-readable topic labels from `topic_labeling.py`
+
+
+How to Run
+----------
+1) Basic visualization (no LLM labels):
+
+    python -m src.visualization
+
+2) German LLM-labeled visualizations:
+
+    python -m src.visualization --german
+
+3) Bilingual visualizations (German + English):
+
+    python -m src.visualization --german --english
+
+
+Prerequisites
+-------------
+- Must run `topic_modeling.py` first to generate model artifacts
+- For LLM-labeled visualizations, must run topic_modeling with `--use-llm` flag
+- Language-specific visualizations require corresponding labeled artifacts:
+    - `--german` requires artifacts in `topic_models/*/german/`
+    - `--english` requires artifacts in `topic_models/*/english/`
+
+
+File Mapping
+------------
+- 00-04: Comparison metrics (always in main results/)
+- 05: LDA topic-word tables with labels (language-specific)
+- 06: LDA predominance charts (main results/)
+- 07: BERTopic topic info with labels (language-specific)
+- 08: BERTopic predominance chart (main results/)
+- 09: pyLDAvis interactive LDA visualization (language-specific)
+- 10-14: BERTopic interactive visualizations (language-specific)
 """
 
 import pandas as pd
@@ -25,7 +72,12 @@ from gensim import matutils
 from gensim.corpora import Dictionary
 from scipy.sparse import load_npz
 
-from src.config import RESULTS_DIR, RANDOM_STATE
+from src.config import (
+    RESULTS_DIR,
+    RESULTS_DIR_DE,
+    RESULTS_DIR_EN,
+    RANDOM_STATE,
+)
 from src.data_loader import (
     load_lda_bow_doc_topics,
     load_lda_bow_info,
@@ -41,11 +93,60 @@ from src.data_loader import (
     load_bertopic_doc_topics,
     load_bertopic_model,
     load_lda_vectorized_artifacts,
+    # Labeled topic loaders
+    load_lda_labeled_topics,
+    load_lda_labeled_doc_topics,
+    load_bertopic_labeled_topics,
+    load_bertopic_labeled_doc_topics,
+    load_bertopic_model_labeled,
 )
 
 # Set plotting style
 sns.set_style("whitegrid")
 sns.set_palette("husl")
+
+
+# =====================================================================
+# Helper Functions
+# =====================================================================
+
+def _get_results_dir(language: str = None) -> Path:
+    """
+    Get the appropriate results directory based on language.
+
+    Parameters
+    ----------
+    language : str, optional
+        Language code ('de', 'en', or None for base directory)
+
+    Returns
+    -------
+    Path
+        Results directory for the specified language
+    """
+    if language == 'de':
+        return RESULTS_DIR_DE
+    elif language == 'en':
+        return RESULTS_DIR_EN
+    else:
+        return RESULTS_DIR
+
+
+def _get_file_suffix(language: str = None) -> str:
+    """
+    Get filename suffix based on language.
+
+    Parameters
+    ----------
+    language : str, optional
+        Language code ('de', 'en', or None)
+
+    Returns
+    -------
+    str
+        Filename suffix ('' for German/None, '_en' for English)
+    """
+    return '_en' if language == 'en' else ''
 
 
 # =====================================================================
@@ -289,7 +390,7 @@ def create_vectorization_comparison_summary(save_csv=True):
 # OBJECTIVE 2: LDA Predominant Topics (ALL Topics)
 # =====================================================================
 
-def extract_lda_all_topics(model_type='bow', top_n_words=10, save_csv=True):
+def extract_lda_all_topics(model_type='bow', top_n_words=10, save_csv=True, language=None):
     """
     Extract ALL topics from LDA model with predominance information.
 
@@ -300,21 +401,36 @@ def extract_lda_all_topics(model_type='bow', top_n_words=10, save_csv=True):
     top_n_words : int, default=10
         Number of top words to extract per topic
     save_csv : bool, default=True
-        If True, save table to RESULTS_DIR.
+        If True, save table to results directory.
+    language : str, optional
+        Language for labeled topics ('de', 'en', or None for unlabeled)
 
     Returns
     -------
     pd.DataFrame
         Table with all topics, document counts, and top words.
     """
-    if model_type == 'bow':
-        doc_topics = load_lda_bow_doc_topics()
-        topics_df = load_lda_bow_topics()
-        prefix = 'BoW'
+    # Try to load labeled data if language is specified
+    if language in ['de', 'en']:
+        try:
+            topics_df = load_lda_labeled_topics(model_type=model_type, language=language)
+            doc_topics = load_lda_labeled_doc_topics(model_type=model_type, language=language)
+            has_labels = True
+        except FileNotFoundError:
+            print(f"⚠️  Labeled data not found for language '{language}'. Falling back to unlabeled data.")
+            language = None
+            has_labels = False
     else:
-        doc_topics = load_lda_tfidf_doc_topics()
-        topics_df = load_lda_tfidf_topics()
-        prefix = 'TF-IDF'
+        has_labels = False
+
+    # Load unlabeled data if no language specified or labeled data not found
+    if not has_labels:
+        if model_type == 'bow':
+            doc_topics = load_lda_bow_doc_topics()
+            topics_df = load_lda_bow_topics()
+        else:
+            doc_topics = load_lda_tfidf_doc_topics()
+            topics_df = load_lda_tfidf_topics()
 
     # Count documents per topic
     topic_counts = doc_topics['dominant_topic'].value_counts().sort_index()
@@ -322,24 +438,34 @@ def extract_lda_all_topics(model_type='bow', top_n_words=10, save_csv=True):
     # Extract top words per topic
     all_topics = []
     for topic_id in sorted(topics_df['topic_id'].unique()):
-        top_words = (topics_df[topics_df['topic_id'] == topic_id]
-                     .nlargest(top_n_words, 'weight')['word'].tolist())
+        topic_data = topics_df[topics_df['topic_id'] == topic_id]
+        top_words = topic_data.nlargest(top_n_words, 'weight')['word'].tolist()
 
         doc_count = topic_counts.get(topic_id, 0)
         pct = (doc_count / len(doc_topics)) * 100
 
-        all_topics.append({
+        row = {
             'Topic_ID': topic_id,
             'Doc_Count': doc_count,
             'Percentage': f"{pct:.1f}%",
             'Top_Words': ', '.join(top_words),
             'Is_Predominant': doc_count == topic_counts.max()
-        })
+        }
+
+        # Add topic name if labels available
+        if has_labels and 'topic_name' in topic_data.columns:
+            topic_name = topic_data['topic_name'].iloc[0]
+            row = {'Topic_ID': topic_id, 'Topic_Name': topic_name, **{k: v for k, v in row.items() if k != 'Topic_ID'}}
+
+        all_topics.append(row)
 
     df_topics = pd.DataFrame(all_topics)
 
     if save_csv:
-        output_path = RESULTS_DIR / f"05_lda_{model_type}_all_topics.csv"
+        results_dir = _get_results_dir(language)
+        results_dir.mkdir(parents=True, exist_ok=True)
+        suffix = _get_file_suffix(language)
+        output_path = results_dir / f"05_lda_{model_type}_all_topics{suffix}.csv"
         df_topics.to_csv(output_path, index=False)
         print(f"✓ Saved: {output_path}")
 
@@ -410,7 +536,7 @@ def visualize_lda_all_topics_predominance(model_type='bow', save_fig=True):
     return fig
 
 
-def visualize_lda_pyldavis(model_type='bow', save_html=True):
+def visualize_lda_pyldavis(model_type='bow', save_html=True, language=None):
     """
     Create interactive pyLDAvis visualization for LDA model.
 
@@ -419,7 +545,10 @@ def visualize_lda_pyldavis(model_type='bow', save_html=True):
     model_type : str, default='bow'
         'bow' or 'tfidf'
     save_html : bool, default=True
-        If True, save interactive HTML to RESULTS_DIR.
+        If True, save interactive HTML to results directory.
+    language : str, optional
+        Language for directory structure ('de', 'en', or None for base directory)
+        Note: pyLDAvis uses the model directly, not labeled data
 
     Returns
     -------
@@ -458,7 +587,10 @@ def visualize_lda_pyldavis(model_type='bow', save_html=True):
     )
 
     if save_html:
-        output_path = RESULTS_DIR / f"09_lda_{prefix}_pyldavis.html"
+        results_dir = _get_results_dir(language)
+        results_dir.mkdir(parents=True, exist_ok=True)
+        suffix = _get_file_suffix(language)
+        output_path = results_dir / f"09_lda_{prefix}_pyldavis{suffix}.html"
         pyLDAvis.save_html(vis, str(output_path))
         print(f"✓ Saved: {output_path}")
 
@@ -469,7 +601,7 @@ def visualize_lda_pyldavis(model_type='bow', save_html=True):
 # OBJECTIVE 3: BERTopic Predominant Topics (ALL Topics)
 # =====================================================================
 
-def extract_bertopic_all_topics(top_n_words=10, save_csv=True):
+def extract_bertopic_all_topics(top_n_words=10, save_csv=True, language=None):
     """
     Extract ALL topics from BERTopic model with predominance information.
 
@@ -478,15 +610,30 @@ def extract_bertopic_all_topics(top_n_words=10, save_csv=True):
     top_n_words : int, default=10
         Number of top words to show per topic
     save_csv : bool, default=True
-        If True, save table to RESULTS_DIR.
+        If True, save table to results directory.
+    language : str, optional
+        Language for labeled topics ('de', 'en', or None for unlabeled)
 
     Returns
     -------
     pd.DataFrame
         Table with all topics, document counts, and top words.
     """
-    topic_info = load_bertopic_topic_info()
-    doc_topics = load_bertopic_doc_topics()
+    # Try to load labeled data if language is specified
+    if language in ['de', 'en']:
+        try:
+            topic_info = load_bertopic_labeled_topics(language=language)
+            doc_topics = load_bertopic_labeled_doc_topics(language=language)
+            has_labels = True
+        except FileNotFoundError:
+            print(f"⚠️  Labeled data not found for language '{language}'. Falling back to unlabeled data.")
+            topic_info = load_bertopic_topic_info()
+            doc_topics = load_bertopic_doc_topics()
+            has_labels = False
+    else:
+        topic_info = load_bertopic_topic_info()
+        doc_topics = load_bertopic_doc_topics()
+        has_labels = False
 
     total_docs = len(doc_topics)
     max_count = topic_info[topic_info['Topic'] != -1]['Count'].max()
@@ -504,9 +651,15 @@ def extract_bertopic_all_topics(top_n_words=10, save_csv=True):
         except:
             top_words_str = str(row['Representation'])[:100]
 
+        # Use LLM-generated name if available, otherwise use default
+        if has_labels and 'Name' in row:
+            topic_name = row['Name']
+        else:
+            topic_name = row.get('Name', f"Topic {topic_id}")
+
         all_topics.append({
             'Topic_ID': topic_id,
-            'Topic_Name': row['Name'] if 'Name' in row else f"Topic {topic_id}",
+            'Topic_Name': topic_name,
             'Doc_Count': count,
             'Percentage': f"{pct:.1f}%",
             'Top_Words': top_words_str,
@@ -517,7 +670,10 @@ def extract_bertopic_all_topics(top_n_words=10, save_csv=True):
     df_topics = pd.DataFrame(all_topics)
 
     if save_csv:
-        output_path = RESULTS_DIR / "07_bertopic_all_topics.csv"
+        results_dir = _get_results_dir(language)
+        results_dir.mkdir(parents=True, exist_ok=True)
+        suffix = _get_file_suffix(language)
+        output_path = results_dir / f"07_bertopic_all_topics{suffix}.csv"
         df_topics.to_csv(output_path, index=False)
         print(f"✓ Saved: {output_path}")
 
@@ -604,28 +760,48 @@ def visualize_bertopic_all_topics_predominance(save_fig=True):
     return fig
 
 
-def visualize_bertopic_interactive_all(save_html=True):
+def visualize_bertopic_interactive_all(save_html=True, language=None):
     """
     Create all BERTopic built-in interactive visualizations.
 
     Parameters
     ----------
     save_html : bool, default=True
-        If True, save interactive HTML files to RESULTS_DIR.
+        If True, save interactive HTML files to results directory.
+    language : str, optional
+        Language for labeled model ('de', 'en', or None for unlabeled)
 
     Returns
     -------
     dict
         Dictionary of Plotly figure objects.
     """
-    model = load_bertopic_model()
-    topic_info = load_bertopic_topic_info()
-    doc_topics = load_bertopic_doc_topics()
+    # Try to load labeled model if language is specified
+    if language in ['de', 'en']:
+        try:
+            model = load_bertopic_model_labeled(language=language)
+            topic_info = load_bertopic_labeled_topics(language=language)
+            doc_topics = load_bertopic_labeled_doc_topics(language=language)
+        except FileNotFoundError:
+            print(f"⚠️  Labeled model not found for language '{language}'. Falling back to unlabeled model.")
+            model = load_bertopic_model()
+            topic_info = load_bertopic_topic_info()
+            doc_topics = load_bertopic_doc_topics()
+            language = None
+    else:
+        model = load_bertopic_model()
+        topic_info = load_bertopic_topic_info()
+        doc_topics = load_bertopic_doc_topics()
 
     # Load original documents for some visualizations
     from src.data_loader import load_cleaned_for_bertopic
     df_bertopic = load_cleaned_for_bertopic()
     docs = df_bertopic['bertopic_description'].tolist()
+
+    # Get output directory and suffix
+    results_dir = _get_results_dir(language)
+    results_dir.mkdir(parents=True, exist_ok=True)
+    suffix = _get_file_suffix(language)
 
     figures = {}
 
@@ -634,7 +810,7 @@ def visualize_bertopic_interactive_all(save_html=True):
         fig1 = model.visualize_topics()
         figures['topic_space'] = fig1
         if save_html:
-            output_path = RESULTS_DIR / "10_bertopic_topic_space.html"
+            output_path = results_dir / f"10_bertopic_topic_space{suffix}.html"
             fig1.write_html(str(output_path))
             print(f"✓ Saved: {output_path}")
     except Exception as e:
@@ -645,7 +821,7 @@ def visualize_bertopic_interactive_all(save_html=True):
         fig2 = model.visualize_hierarchy()
         figures['hierarchy'] = fig2
         if save_html:
-            output_path = RESULTS_DIR / "11_bertopic_hierarchy.html"
+            output_path = results_dir / f"11_bertopic_hierarchy{suffix}.html"
             fig2.write_html(str(output_path))
             print(f"✓ Saved: {output_path}")
     except Exception as e:
@@ -657,7 +833,7 @@ def visualize_bertopic_interactive_all(save_html=True):
         fig3 = model.visualize_barchart(top_n_topics=num_topics, n_words=10)
         figures['barchart'] = fig3
         if save_html:
-            output_path = RESULTS_DIR / "12_bertopic_barchart.html"
+            output_path = results_dir / f"12_bertopic_barchart{suffix}.html"
             fig3.write_html(str(output_path))
             print(f"✓ Saved: {output_path}")
     except Exception as e:
@@ -668,7 +844,7 @@ def visualize_bertopic_interactive_all(save_html=True):
         fig4 = model.visualize_heatmap()
         figures['heatmap'] = fig4
         if save_html:
-            output_path = RESULTS_DIR / "13_bertopic_heatmap.html"
+            output_path = results_dir / f"13_bertopic_heatmap{suffix}.html"
             fig4.write_html(str(output_path))
             print(f"✓ Saved: {output_path}")
     except Exception as e:
@@ -679,7 +855,7 @@ def visualize_bertopic_interactive_all(save_html=True):
         fig5 = model.visualize_documents(docs, reduced_embeddings=model.umap_model.transform(model.embedding_model.embed(docs)))
         figures['documents'] = fig5
         if save_html:
-            output_path = RESULTS_DIR / "14_bertopic_documents.html"
+            output_path = results_dir / f"14_bertopic_documents{suffix}.html"
             fig5.write_html(str(output_path))
             print(f"✓ Saved: {output_path}")
     except Exception as e:
@@ -692,22 +868,35 @@ def visualize_bertopic_interactive_all(save_html=True):
 # MAIN EXECUTION
 # =====================================================================
 
-def run_visualization_pipeline():
+def run_visualization_pipeline(use_llm_labels=False, generate_english=False):
     """
     Run complete visualization pipeline for all 3 primary objectives.
 
     Generates:
-    - BoW vs TF-IDF comparison visualizations
+    - BoW vs TF-IDF comparison visualizations (always in main results/)
     - LDA predominant topics analysis (ALL topics)
     - BERTopic predominant topics analysis (ALL topics)
+    - Optional: Bilingual labeled visualizations (german/ and english/ subdirs)
 
-    All outputs saved to RESULTS_DIR.
+    Parameters
+    ----------
+    use_llm_labels : bool, default=False
+        If True, generate visualizations with LLM-generated topic labels
+        and save to language-specific directories (results/german/)
+    generate_english : bool, default=False
+        If True, also generate English versions (requires use_llm_labels=True)
+        Saves to results/english/
+
+    Returns
+    -------
+    None
+        All outputs saved to RESULTS_DIR (and language subdirs if applicable)
     """
     print("=" * 80)
     print("TOPIC MODELING VISUALIZATION PIPELINE")
     print("=" * 80)
 
-    # Objective 1: BoW vs TF-IDF Comparison
+    # Objective 1: BoW vs TF-IDF Comparison (always in main results/, no language subdirs)
     print("\n[1/3] Comparing BoW vs TF-IDF Vectorization...")
     print("-" * 80)
     create_vectorization_comparison_summary()
@@ -715,34 +904,64 @@ def run_visualization_pipeline():
     compare_k_selection()
     compare_topic_balance()
 
-    # Objective 2: LDA Predominant Topics
-    print("\n[2/3] Extracting ALL LDA Predominant Topics...")
-    print("-" * 80)
-    extract_lda_all_topics(model_type='bow')
-    extract_lda_all_topics(model_type='tfidf')
-    visualize_lda_all_topics_predominance(model_type='bow')
-    visualize_lda_all_topics_predominance(model_type='tfidf')
+    # Determine which languages to generate
+    languages = []
+    if use_llm_labels:
+        languages.append('de')
+        if generate_english:
+            languages.append('en')
+    else:
+        languages.append(None)  # Unlabeled, main results/
 
-    # Objective 3: BERTopic Predominant Topics
-    print("\n[3/3] Extracting ALL BERTopic Predominant Topics...")
-    print("-" * 80)
-    extract_bertopic_all_topics()
-    visualize_bertopic_all_topics_predominance()
+    # Generate visualizations for each language
+    for lang in languages:
+        lang_label = f" ({lang.upper()})" if lang else ""
 
-    # Additional: Interactive Visualizations
-    print("\n[BONUS] Generating Interactive Visualizations...")
-    print("-" * 80)
-    print("pyLDAvis (BoW)...")
-    visualize_lda_pyldavis(model_type='bow')
-    print("pyLDAvis (TF-IDF)...")
-    visualize_lda_pyldavis(model_type='tfidf')
-    print("BERTopic interactive plots...")
-    visualize_bertopic_interactive_all()
+        # Objective 2: LDA Predominant Topics
+        print(f"\n[2/3] Extracting ALL LDA Predominant Topics{lang_label}...")
+        print("-" * 80)
+        extract_lda_all_topics(model_type='bow', language=lang)
+        extract_lda_all_topics(model_type='tfidf', language=lang)
+
+        # Objective 3: BERTopic Predominant Topics
+        print(f"\n[3/3] Extracting ALL BERTopic Predominant Topics{lang_label}...")
+        print("-" * 80)
+        extract_bertopic_all_topics(language=lang)
+
+        # Interactive Visualizations
+        print(f"\n[BONUS] Generating Interactive Visualizations{lang_label}...")
+        print("-" * 80)
+        print(f"pyLDAvis (BoW){lang_label}...")
+        visualize_lda_pyldavis(model_type='bow', language=lang)
+        print(f"pyLDAvis (TF-IDF){lang_label}...")
+        visualize_lda_pyldavis(model_type='tfidf', language=lang)
+        print(f"BERTopic interactive plots{lang_label}...")
+        visualize_bertopic_interactive_all(language=lang)
+
+    # Static visualizations (only when generating unlabeled - files 06, 08)
+    if None in languages:
+        print("\n[STATIC] Generating Static Visualizations...")
+        print("-" * 80)
+        visualize_lda_all_topics_predominance(model_type='bow')
+        visualize_lda_all_topics_predominance(model_type='tfidf')
+        visualize_bertopic_all_topics_predominance()
 
     print("\n" + "=" * 80)
-    print(f"✓ COMPLETE! All visualizations saved to: {RESULTS_DIR}")
+    results_msg = f"✓ COMPLETE! Visualizations saved to: {RESULTS_DIR}"
+    if use_llm_labels:
+        results_msg += f"\n  - German: {RESULTS_DIR_DE}"
+        if generate_english:
+            results_msg += f"\n  - English: {RESULTS_DIR_EN}"
+    print(results_msg)
     print("=" * 80)
 
 
 if __name__ == "__main__":
-    run_visualization_pipeline()
+    import argparse
+    parser = argparse.ArgumentParser(description="Generate topic modeling visualizations")
+    parser.add_argument("--german", action="store_true", help="Generate German labeled visualizations")
+    parser.add_argument("--english", action="store_true", help="Generate English labeled visualizations")
+    args = parser.parse_args()
+
+    use_llm = args.german or args.english
+    run_visualization_pipeline(use_llm_labels=use_llm, generate_english=args.english)
