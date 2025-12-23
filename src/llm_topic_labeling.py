@@ -360,7 +360,8 @@ def _save_bertopic_labeled_artifacts_with_keywords(
     original_keywords: dict,
     language: str = 'de',
     translate_keywords: bool = False,
-    translated_labels: dict = None
+    translated_labels: dict = None,
+    original_keywords_with_scores: dict = None
 ) -> None:
     """
     Save BERTopic artifacts with LLM-generated topic labels AND original c-TF-IDF keywords.
@@ -380,6 +381,8 @@ def _save_bertopic_labeled_artifacts_with_keywords(
     translated_labels : dict, optional
         Mapping of topic_id -> translated_label (English). If provided and language='en',
         replaces the Name column with translated topic names.
+    original_keywords_with_scores : dict, optional
+        Mapping of topic_id -> list of (keyword, score) tuples for restoring topic_representations_
     """
     output_dir.mkdir(parents=True, exist_ok=True)
     suffix = '' if language == 'de' else '_en'
@@ -404,6 +407,7 @@ def _save_bertopic_labeled_artifacts_with_keywords(
 
     # Replace Representation field with original c-TF-IDF keywords
     representations = []
+    translated_keywords_dict = {}
     for _, row in info_df.iterrows():
         topic_id = row['Topic']
         if topic_id in original_keywords:
@@ -419,6 +423,8 @@ def _save_bertopic_labeled_artifacts_with_keywords(
                 english_keywords = translate_text_with_llm(german_keywords)
                 translated_keywords = [w.strip() for w in english_keywords.split(',')]
                 representations.append(translated_keywords)
+                if topic_id != -1:
+                    translated_keywords_dict[topic_id] = translated_keywords
             except Exception as e:
                 print(f"    Warning: Translation failed for topic {topic_id}: {e}")
                 representations.append(keywords)
@@ -429,8 +435,27 @@ def _save_bertopic_labeled_artifacts_with_keywords(
 
     # Update Name column with translated labels if provided
     if translated_labels and language == 'en':
-        # Map topic IDs to English names; keep original if translation not available
         info_df['Name'] = info_df['Topic'].map(translated_labels).fillna(info_df['Name'])
+
+    # Restore c-TF-IDF keywords to topic_representations_ for barchart visualizations
+    if original_keywords_with_scores:
+        new_topic_representations = {}
+        for topic_id, keywords_with_scores in original_keywords_with_scores.items():
+            if not keywords_with_scores or topic_id == -1:
+                continue
+
+            if translate_keywords and language == 'en' and topic_id in translated_keywords_dict:
+                english_words = translated_keywords_dict[topic_id]
+                if len(english_words) == len(keywords_with_scores):
+                    new_topic_representations[topic_id] = [
+                        (eng_word, score) for eng_word, (_, score) in zip(english_words, keywords_with_scores)
+                    ]
+                else:
+                    new_topic_representations[topic_id] = keywords_with_scores
+            else:
+                new_topic_representations[topic_id] = keywords_with_scores
+
+        topic_model.topic_representations_ = new_topic_representations
 
     # Save model (without representation_model to avoid pickle errors)
     temp_repr_model = topic_model.representation_model
@@ -577,20 +602,25 @@ def label_bertopic_model(generate_english: bool = False) -> None:
     df_bertopic = load_cleaned_for_bertopic()
     texts = df_bertopic["bertopic_description"].fillna("").astype(str).tolist()
 
-    # Preserve original c-TF-IDF keywords before calling update_topics()
+    # Preserve original c-TF-IDF keywords AND scores before calling update_topics()
     # update_topics() replaces them with LLM labels, but we want to keep the original keywords
     original_topic_info = topic_model.get_topic_info()
     original_keywords = {}
+    original_keywords_with_scores = {}  # Preserve scores for topic_representations_
     for _, row in original_topic_info.iterrows():
         topic_id = row['Topic']
         # Get keywords from the topic model directly
         if topic_id != -1:
             topic_keywords = topic_model.get_topic(topic_id)
             if topic_keywords:
+                # Store keywords only (for CSV)
                 original_keywords[topic_id] = [word for word, _ in topic_keywords[:10]]
+                # Store keywords with scores (for topic_representations_)
+                original_keywords_with_scores[topic_id] = topic_keywords[:10]
         else:
             # For outlier topic (-1), use Representation field
             original_keywords[topic_id] = eval(row['Representation']) if isinstance(row['Representation'], str) else row['Representation']
+            original_keywords_with_scores[topic_id] = []
 
     # ========== GERMAN LABELS ==========
     print("\n[1/2] Generating German labels...")
@@ -625,7 +655,8 @@ def label_bertopic_model(generate_english: bool = False) -> None:
     # Save German artifacts with ORIGINAL keywords restored and German labels
     _save_bertopic_labeled_artifacts_with_keywords(
         topic_model, BERTOPIC_TOPIC_DIR_DE, original_keywords,
-        language='de', translated_labels=german_labels
+        language='de', translated_labels=german_labels,
+        original_keywords_with_scores=original_keywords_with_scores
     )
 
     print(f"\n✅ Saved German labeled artifacts to: {BERTOPIC_TOPIC_DIR_DE}")
@@ -669,7 +700,8 @@ def label_bertopic_model(generate_english: bool = False) -> None:
         # Save English artifacts with ORIGINAL keywords restored and translated
         _save_bertopic_labeled_artifacts_with_keywords(
             topic_model, BERTOPIC_TOPIC_DIR_EN, original_keywords,
-            language='en', translate_keywords=True, translated_labels=english_labels
+            language='en', translate_keywords=True, translated_labels=english_labels,
+            original_keywords_with_scores=original_keywords_with_scores
         )
 
         print(f"\n✅ Saved English labeled artifacts to: {BERTOPIC_TOPIC_DIR_EN}")
