@@ -180,7 +180,8 @@ LLM_NUM_KEYWORDS = 10
 # Number of representative documents to include in LLM prompts for context
 # BERTopic: uses built-in representative documents
 # LDA: uses documents with highest topic probability
-LLM_NUM_REPRESENTATIVE_DOCS = 2
+# Increased from 2 to 6 for better pattern recognition and reduced overgeneralization
+LLM_NUM_REPRESENTATIVE_DOCS = 6
 
 # =======================
 # Topic Modeling Settings

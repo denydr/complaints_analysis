@@ -547,8 +547,8 @@ def visualize_lda_pyldavis(model_type='bow', save_html=True, language=None):
     save_html : bool, default=True
         If True, save interactive HTML to results directory.
     language : str, optional
-        Language for directory structure ('de', 'en', or None for base directory)
-        Note: pyLDAvis uses the model directly, not labeled data
+        Language for directory structure and keyword translation ('de', 'en', or None)
+        If 'en', keywords will be translated to English using labeled data
 
     Returns
     -------
@@ -569,12 +569,38 @@ def visualize_lda_pyldavis(model_type='bow', save_html=True, language=None):
     # Convert to Gensim corpus format
     corpus = matutils.Sparse2Corpus(X_sparse, documents_columns=False)
 
-    # Create proper gensim Dictionary object from model's id2word
-    # The model's id2word is a plain dict {id: word}, we need a Dictionary object
-    id2word_dict = lda_model.id2word
-    dictionary = Dictionary()
-    dictionary.token2id = {word: idx for idx, word in id2word_dict.items()}
-    dictionary.id2token = id2word_dict
+    # Check if id2word is a proper Dictionary object or a plain dict
+    if hasattr(lda_model.id2word, 'token2id'):
+        # Already a proper Dictionary object with all attributes
+        dictionary = lda_model.id2word
+    else:
+        # id2word is a plain dict - need to create a proper Dictionary
+        # pyLDAvis requires a Dictionary with num_docs, num_pos, dfs, cfs attributes
+        dictionary = Dictionary()
+        dictionary.id2token = dict(lda_model.id2word)
+        dictionary.token2id = {word: id_ for id_, word in dictionary.id2token.items()}
+
+        # Compute required attributes from the corpus
+        dictionary.num_docs = 0
+        dictionary.num_pos = 0
+        dictionary.num_nnz = 0
+        dictionary.dfs = {}  # document frequency: how many docs each word appears in
+        dictionary.cfs = {}  # collection frequency: total count of each word
+
+        # Iterate through corpus to compute frequencies
+        for doc in corpus:
+            dictionary.num_docs += 1
+            doc_words = set()
+            for word_id, count in doc:
+                dictionary.num_pos += count
+                dictionary.num_nnz += 1
+                dictionary.cfs[word_id] = dictionary.cfs.get(word_id, 0) + count
+                doc_words.add(word_id)
+            # Update document frequencies
+            for word_id in doc_words:
+                dictionary.dfs[word_id] = dictionary.dfs.get(word_id, 0) + 1
+
+        print(f"  ✓ Constructed Dictionary with {len(dictionary)} words from corpus")
 
     # Create visualization with t-SNE and random_state for reproducibility
     vis = gensimvis.prepare(
@@ -807,7 +833,7 @@ def visualize_bertopic_interactive_all(save_html=True, language=None):
 
     # 1. Topic space visualization (2D UMAP projection)
     try:
-        fig1 = model.visualize_topics()
+        fig1 = model.visualize_topics(width=1200, height=800, custom_labels=True)
         figures['topic_space'] = fig1
         if save_html:
             output_path = results_dir / f"10_bertopic_topic_space{suffix}.html"
@@ -818,7 +844,7 @@ def visualize_bertopic_interactive_all(save_html=True, language=None):
 
     # 2. Hierarchical topic clustering
     try:
-        fig2 = model.visualize_hierarchy()
+        fig2 = model.visualize_hierarchy(width=1200, height=800, custom_labels=True)
         figures['hierarchy'] = fig2
         if save_html:
             output_path = results_dir / f"11_bertopic_hierarchy{suffix}.html"
@@ -830,7 +856,7 @@ def visualize_bertopic_interactive_all(save_html=True, language=None):
     # 3. Top words per topic (bar chart)
     try:
         num_topics = len(topic_info[topic_info['Topic'] != -1])
-        fig3 = model.visualize_barchart(top_n_topics=num_topics, n_words=10)
+        fig3 = model.visualize_barchart(top_n_topics=num_topics, n_words=10, width=1000, height=600, custom_labels=True)
         figures['barchart'] = fig3
         if save_html:
             output_path = results_dir / f"12_bertopic_barchart{suffix}.html"
@@ -841,7 +867,7 @@ def visualize_bertopic_interactive_all(save_html=True, language=None):
 
     # 4. Topic similarity heatmap
     try:
-        fig4 = model.visualize_heatmap()
+        fig4 = model.visualize_heatmap(custom_labels=True)
         figures['heatmap'] = fig4
         if save_html:
             output_path = results_dir / f"13_bertopic_heatmap{suffix}.html"
@@ -852,7 +878,7 @@ def visualize_bertopic_interactive_all(save_html=True, language=None):
 
     # 5. Document visualization (if documents are available)
     try:
-        fig5 = model.visualize_documents(docs, reduced_embeddings=model.umap_model.transform(model.embedding_model.embed(docs)))
+        fig5 = model.visualize_documents(docs, reduced_embeddings=model.umap_model.transform(model.embedding_model.embed(docs)), custom_labels=True)
         figures['documents'] = fig5
         if save_html:
             output_path = results_dir / f"14_bertopic_documents{suffix}.html"

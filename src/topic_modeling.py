@@ -81,6 +81,7 @@ import argparse
 import joblib
 import numpy as np
 import pandas as pd
+from collections import Counter
 
 from gensim import matutils
 from gensim.models import LdaModel
@@ -575,12 +576,15 @@ def run_bertopic_pipeline(
     - Reduces dimensionality via UMAP (n_neighbors, n_components, min_dist)
     - Clusters documents using HDBSCAN (min_cluster_size, min_samples)
     - Extracts topic representations using class-based TF-IDF (c-TF-IDF)
+    - Reduces outliers via threshold-based embedding similarity (threshold=0.6)
     - Optionally reduces topics via hierarchical merging (nr_topics)
     - Saves trained model, topic summaries, and document assignments
 
     Hyperparameter choices balance topic granularity and coverage for datasets
     with imbalanced category distributions (e.g., 60% street lighting complaints).
-    Default settings discover 6-8 natural clusters with ~15-20% outliers.
+    Default settings discover 6-8 natural clusters with initial ~15-20% outliers,
+    reduced to ~5-10% after threshold-based reassignment. Original c-TF-IDF topic
+    representations are preserved (no model retraining after outlier reduction).
 
     Parameters
     ----------
@@ -678,23 +682,48 @@ def run_bertopic_pipeline(
 
     topics, _ = topic_model.fit_transform(texts)
 
+    # Count outliers before reduction
+    n_outliers_before = int((np.array(topics) == -1).sum())
+    outlier_pct_before = (n_outliers_before / len(topics)) * 100 if len(topics) > 0 else 0
+
+    # Reduce outliers using threshold-based embedding similarity
+    # Only reassign outliers with cosine similarity > 0.6 to nearest topic
+    # This preserves original c-TF-IDF representations while selectively reassigning
+    print(f"\nReducing outliers (initial: {n_outliers_before} / {len(topics)} = {outlier_pct_before:.1f}%)...")
+    print("Using embeddings strategy with threshold=0.6 (only reassign confident matches)...")
+    new_topics = topic_model.reduce_outliers(texts, topics, strategy="embeddings", threshold=0.6)
+
+    # Count outliers after reduction
+    n_outliers_after = int((np.array(new_topics) == -1).sum())
+    outlier_pct_after = (n_outliers_after / len(new_topics)) * 100 if len(new_topics) > 0 else 0
+
+    # Note: We intentionally do NOT call update_topics(texts, topics=new_topics) here
+    # because that would recalculate c-TF-IDF and degrade topic quality.
+    # Instead, llm_topic_labeling.py loads corrected counts from the CSV we save below.
+
     BERTOPIC_TOPIC_DIR.mkdir(parents=True, exist_ok=True)
     topic_model.save(BERTOPIC_TOPIC_DIR / "bertopic_model")
 
+    # Get topic info and update counts to reflect actual assignments after outlier reduction
     info_df = topic_model.get_topic_info()
+
+    # Recalculate actual document counts from new_topics (after outlier reduction)
+    actual_counts = Counter(new_topics)
+    info_df['Count'] = info_df['Topic'].apply(lambda t: actual_counts.get(t, 0))
+
     info_df.to_csv(BERTOPIC_TOPIC_DIR / "bertopic_topic_info.csv", index=False)
 
     out_assign = df.copy()
-    out_assign["topic_id"] = topics
+    out_assign["topic_id"] = new_topics
     out_assign.to_csv(BERTOPIC_TOPIC_DIR / "bertopic_doc_topics.csv", index=False)
 
-    n_outliers = int((np.array(topics) == -1).sum())
-    outlier_pct = (n_outliers / len(topics)) * 100 if len(topics) > 0 else 0
-
-    print("BERTopic complete.")
+    print("\nBERTopic complete.")
     print(f"Topics discovered (excl. outliers): {info_df.shape[0] - 1}")
-    print(f"Outliers (-1 assignments): {n_outliers} / {len(topics)} ({outlier_pct:.1f}%)")
-    print(f"Target outlier rate: <15% | Actual: {outlier_pct:.1f}%")
+    print(f"Outliers before reduction: {n_outliers_before} / {len(topics)} ({outlier_pct_before:.1f}%)")
+    print(f"Outliers after reduction:  {n_outliers_after} / {len(new_topics)} ({outlier_pct_after:.1f}%)")
+    reduction_count = n_outliers_before - n_outliers_after
+    reduction_pct = outlier_pct_before - outlier_pct_after
+    print(f"Outliers reduced by: {reduction_count} documents ({reduction_pct:.1f} percentage points)")
     print(f"Saved model to: {BERTOPIC_TOPIC_DIR / 'bertopic_model'}")
     print(f"Saved topic info to: {BERTOPIC_TOPIC_DIR / 'bertopic_topic_info.csv'}")
 

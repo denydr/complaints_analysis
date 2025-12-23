@@ -97,6 +97,7 @@ import openai
 from src.config import (
     OPENAI_API_KEY,
     LLM_MODEL,
+    LLM_NUM_REPRESENTATIVE_DOCS,
     LDA_TOPIC_DIR,
     LDA_TOPIC_DIR_DE,
     LDA_TOPIC_DIR_EN,
@@ -383,14 +384,23 @@ def _save_bertopic_labeled_artifacts_with_keywords(
     output_dir.mkdir(parents=True, exist_ok=True)
     suffix = '' if language == 'de' else '_en'
 
-    # Save model (without representation_model to avoid pickle errors)
-    temp_repr_model = topic_model.representation_model
-    topic_model.representation_model = None
-    topic_model.save(output_dir / "bertopic_model")
-    topic_model.representation_model = temp_repr_model
+    # Update model's internal topic labels with custom labels
+    # This ensures interactive visualizations (visualize_topics, visualize_hierarchy, etc.)
+    # display the LLM-generated labels when custom_labels=True is passed
+    # IMPORTANT: Use set_topic_labels() to properly convert dict to list format
+    if translated_labels:
+        topic_model.set_topic_labels(translated_labels)
 
     # Save topic info with LLM labels AND original c-TF-IDF keywords
     info_df = topic_model.get_topic_info()
+
+    # Load corrected counts from the CSV saved by topic_modeling.py
+    # The model object has old counts (before outlier reduction), but the CSV has correct counts
+    corrected_topic_info_path = BERTOPIC_TOPIC_DIR / "bertopic_topic_info.csv"
+    if corrected_topic_info_path.exists():
+        corrected_counts = pd.read_csv(corrected_topic_info_path)[['Topic', 'Count']]
+        # Update Count column with corrected values
+        info_df = info_df.drop(columns=['Count']).merge(corrected_counts, on='Topic', how='left')
 
     # Replace Representation field with original c-TF-IDF keywords
     representations = []
@@ -402,7 +412,7 @@ def _save_bertopic_labeled_artifacts_with_keywords(
             # Fallback to current representation
             keywords = eval(row['Representation']) if isinstance(row['Representation'], str) else row['Representation']
 
-        # Translate keywords for English version (cosmetic only)
+        # Translate keywords for English version
         if translate_keywords and language == 'en' and isinstance(keywords, list):
             try:
                 german_keywords = ', '.join(keywords[:10])
@@ -421,6 +431,12 @@ def _save_bertopic_labeled_artifacts_with_keywords(
     if translated_labels and language == 'en':
         # Map topic IDs to English names; keep original if translation not available
         info_df['Name'] = info_df['Topic'].map(translated_labels).fillna(info_df['Name'])
+
+    # Save model (without representation_model to avoid pickle errors)
+    temp_repr_model = topic_model.representation_model
+    topic_model.representation_model = None
+    topic_model.save(output_dir / "bertopic_model")
+    topic_model.representation_model = temp_repr_model
 
     info_df.to_csv(
         output_dir / f"bertopic_topic_info_labeled{suffix}.csv",
@@ -588,6 +604,9 @@ def label_bertopic_model(generate_english: bool = False) -> None:
         delay_in_seconds=0.5,
         chat=True,
         prompt=TOPIC_LABELING_PROMPT_DE,
+        nr_docs=LLM_NUM_REPRESENTATIVE_DOCS,  # Send 6 representative docs to LLM (increased from default 4)
+        doc_length=400,  # Limit each doc to 400 chars to reduce noise and focus on core complaint
+        tokenizer="char",  # Truncate by character count (required when doc_length is specified)
     )
 
     # Update topic representations with German labels
@@ -603,9 +622,10 @@ def label_bertopic_model(generate_english: bool = False) -> None:
         if topic_id != -1:
             print(f"   Topic {topic_id}: {label}")
 
-    # Save German artifacts with ORIGINAL keywords restored
+    # Save German artifacts with ORIGINAL keywords restored and German labels
     _save_bertopic_labeled_artifacts_with_keywords(
-        topic_model, BERTOPIC_TOPIC_DIR_DE, original_keywords, language='de'
+        topic_model, BERTOPIC_TOPIC_DIR_DE, original_keywords,
+        language='de', translated_labels=german_labels
     )
 
     print(f"\n✅ Saved German labeled artifacts to: {BERTOPIC_TOPIC_DIR_DE}")
