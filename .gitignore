@@ -1,7 +1,9 @@
 .venv/bin
 .venv
 .idea/
+.DS_Store
 __pycache__/
+data/.DS_Store
 data/cleaned
 data/vectorized
 data/topic_models
