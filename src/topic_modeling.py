@@ -84,6 +84,7 @@ import pandas as pd
 from collections import Counter
 
 from gensim import matutils
+from gensim.corpora import Dictionary
 from gensim.models import LdaModel
 from gensim.models.coherencemodel import CoherenceModel
 
@@ -279,7 +280,6 @@ def _train_gensim_lda(
     vocab_set = set(vocab)
     texts_tokens_aligned = [[tok for tok in doc if tok in vocab_set] for doc in texts_tokens]
 
-    from gensim.corpora import Dictionary
     dictionary = Dictionary(texts_tokens_aligned)
 
     coherence_model = CoherenceModel(
@@ -372,8 +372,6 @@ def _select_best_k_by_coherence(
     if int(k_max) < int(k_min):
         raise ValueError("k_max must be >= k_min")
 
-    from gensim.corpora import Dictionary
-
     corpus = matutils.Sparse2Corpus(X_sparse, documents_columns=False)
     id2word = dict(enumerate(vocab))
 
@@ -407,25 +405,48 @@ def _select_best_k_by_coherence(
         )
         coh = float(coherence_model.get_coherence())
 
+        doc_topics = [lda_tmp.get_document_topics(doc, minimum_probability=0.0) for doc in corpus]
+        dominant_topics = [max(topics, key=lambda x: x[1])[0] if topics else -1 for topics in doc_topics]
+        topic_counts = Counter(dominant_topics)
+        empty_topics = sum(1 for topic_id in range(k) if topic_counts.get(topic_id, 0) == 0)
+
         rows.append(
             {
                 "out_prefix": out_prefix,
                 "k": int(k),
                 "coherence_c_v": coh,
+                "empty_topics": empty_topics,
                 "passes": int(passes),
                 "iterations": int(iterations),
                 "random_state": int(random_state),
             }
         )
 
-        if coh > best_coh:
+        validation_status = "valid" if empty_topics == 0 else f"invalid ({empty_topics} empty)"
+        print(f"  K={k}: coherence={coh:.4f}, {validation_status}")
+
+        # Select best K by coherence (only among valid models with no empty topics)
+        if empty_topics == 0 and coh > best_coh:
             best_coh = coh
             best_k = int(k)
 
-    if best_k is None:
-        best_k = int(k_min)
-
     results_df = pd.DataFrame(rows)
+
+    if best_k is None:
+        print(f"⚠ Warning: No valid models found for {out_prefix} (all K values have empty topics)")
+        print(f"   Falling back to K with fewest empty topics, then highest coherence")
+
+        # Find minimum number of empty topics
+        min_empty = results_df['empty_topics'].min()
+        candidates = results_df[results_df['empty_topics'] == min_empty]
+
+        # Among candidates with min empty topics, select highest coherence
+        best_idx = candidates['coherence_c_v'].idxmax()
+        best_k = int(results_df.loc[best_idx, 'k'])
+        best_coh = results_df.loc[best_idx, 'coherence_c_v']
+
+        print(f"   Selected K={best_k} (min_empty={min_empty}, coherence={best_coh:.4f})")
+
     out_csv.parent.mkdir(parents=True, exist_ok=True)
     results_df.to_csv(out_csv, index=False)
 

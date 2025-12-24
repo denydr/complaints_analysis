@@ -290,8 +290,15 @@ def compare_topic_balance(save_fig=True):
     tfidf_doc_topics = load_lda_tfidf_doc_topics()
 
     # Count documents per topic (dominant topic)
-    bow_counts = bow_doc_topics['dominant_topic'].value_counts().sort_index()
-    tfidf_counts = tfidf_doc_topics['dominant_topic'].value_counts().sort_index()
+    bow_counts_raw = bow_doc_topics['dominant_topic'].value_counts().sort_index()
+    tfidf_counts_raw = tfidf_doc_topics['dominant_topic'].value_counts().sort_index()
+
+    # Get actual K from trained models (not from value_counts which misses empty topics)
+    bow_info = load_lda_bow_info()
+    tfidf_info = load_lda_tfidf_info()
+
+    bow_counts = bow_counts_raw.reindex(range(bow_info['num_topics']), fill_value=0)
+    tfidf_counts = tfidf_counts_raw.reindex(range(tfidf_info['num_topics']), fill_value=0)
 
     # Create figure
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
@@ -354,10 +361,14 @@ def create_vectorization_comparison_summary(save_csv=True):
     tfidf_doc_topics = load_lda_tfidf_doc_topics()
 
     # Calculate balance metrics (standard deviation of document counts)
-    bow_counts = bow_doc_topics['dominant_topic'].value_counts()
-    tfidf_counts = tfidf_doc_topics['dominant_topic'].value_counts()
+    bow_counts_raw = bow_doc_topics['dominant_topic'].value_counts()
+    tfidf_counts_raw = tfidf_doc_topics['dominant_topic'].value_counts()
 
-    bow_balance = bow_counts.std() / bow_counts.mean()  # Coefficient of variation
+    # Reindex to include all topics (including empty ones with 0 documents)
+    bow_counts = bow_counts_raw.reindex(range(bow_info['num_topics']), fill_value=0)
+    tfidf_counts = tfidf_counts_raw.reindex(range(tfidf_info['num_topics']), fill_value=0)
+
+    bow_balance = bow_counts.std() / bow_counts.mean()
     tfidf_balance = tfidf_counts.std() / tfidf_counts.mean()
 
     summary = pd.DataFrame({
@@ -507,7 +518,7 @@ def visualize_lda_all_topics_predominance(model_type='bow', save_fig=True):
         if count == max_count:
             colors.append('#2ecc71')  # Highlight predominant in green
         else:
-            colors.append(plt.cm.get_cmap(color_palette)(0.6))
+            colors.append(plt.colormaps[color_palette](0.6))
 
     bars = ax.bar(topic_counts.index, topic_counts.values, color=colors,
                   edgecolor='black', linewidth=2, alpha=0.8)
