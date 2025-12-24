@@ -620,7 +620,7 @@ def visualize_lda_pyldavis(model_type='bow', save_html=True, language=None):
         dictionary,
         mds='tsne',
         sort_topics=False,
-        R=42  # Random state for t-SNE projection
+        R=10
     )
 
     if save_html:
@@ -968,10 +968,11 @@ def run_visualization_pipeline(use_llm_labels=False, generate_english=False):
         # Interactive Visualizations
         print(f"\n[BONUS] Generating Interactive Visualizations{lang_label}...")
         print("-" * 80)
-        print(f"pyLDAvis (BoW){lang_label}...")
-        visualize_lda_pyldavis(model_type='bow', language=lang)
-        print(f"pyLDAvis (TF-IDF){lang_label}...")
-        visualize_lda_pyldavis(model_type='tfidf', language=lang)
+        if lang != 'en':
+            print(f"pyLDAvis (BoW){lang_label}...")
+            visualize_lda_pyldavis(model_type='bow', language=lang)
+            print(f"pyLDAvis (TF-IDF){lang_label}...")
+            visualize_lda_pyldavis(model_type='tfidf', language=lang)
         print(f"BERTopic interactive plots{lang_label}...")
         visualize_bertopic_interactive_all(language=lang)
 
