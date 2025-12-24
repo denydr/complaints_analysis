@@ -23,7 +23,6 @@ load_dotenv()
 # Project & Data Directories
 # =======================
 
-# src/ is one level below the project root, so we go one level up
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 DATA_ROOT = PROJECT_ROOT / "data"
@@ -171,7 +170,6 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 
 # LLM model to use for generating topic labels
 # gpt-4o-mini: Cost-effective model, suitable for topic labeling tasks
-# Alternative: "gpt-4o" for higher quality (but more expensive)
 LLM_MODEL = "gpt-4o-mini"
 
 # Number of top words to include in LLM prompts for topic labeling
@@ -180,7 +178,6 @@ LLM_NUM_KEYWORDS = 10
 # Number of representative documents to include in LLM prompts for context
 # BERTopic: uses built-in representative documents
 # LDA: uses documents with highest topic probability
-# Increased from 2 to 6 for better pattern recognition and reduced overgeneralization
 LLM_NUM_REPRESENTATIVE_DOCS = 6
 
 # =======================
@@ -213,7 +210,7 @@ LDA_TOPIC_DIR.mkdir(parents=True, exist_ok=True)
 BERTOPIC_TOPIC_DIR.mkdir(parents=True, exist_ok=True)
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
-# Language-specific subdirectories (created on demand when LLM labeling is enabled)
+# Language-specific subdirectories
 LDA_TOPIC_DIR_DE.mkdir(parents=True, exist_ok=True)
 LDA_TOPIC_DIR_EN.mkdir(parents=True, exist_ok=True)
 BERTOPIC_TOPIC_DIR_DE.mkdir(parents=True, exist_ok=True)

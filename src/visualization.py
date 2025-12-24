@@ -486,56 +486,66 @@ def extract_lda_all_topics(model_type='bow', top_n_words=10, save_csv=True, lang
 def visualize_lda_all_topics_predominance(model_type='bow', save_fig=True):
     """
     Visualize document predominance for ALL LDA topics.
-
-    Parameters
-    ----------
-    model_type : str, default='bow'
-        'bow' or 'tfidf'
-    save_fig : bool, default=True
-        If True, save figure to RESULTS_DIR.
-
-    Returns
-    -------
-    plt.Figure
-        Matplotlib figure object.
     """
     if model_type == 'bow':
         doc_topics = load_lda_bow_doc_topics()
+        info = load_lda_bow_info()
         prefix = 'BoW'
         color_palette = 'Blues'
     else:
         doc_topics = load_lda_tfidf_doc_topics()
+        info = load_lda_tfidf_info()
         prefix = 'TF-IDF'
         color_palette = 'Reds'
 
-    topic_counts = doc_topics['dominant_topic'].value_counts().sort_index()
-    max_count = topic_counts.max()
+    num_topics = int(info['num_topics'])
+
+    topic_counts_raw = doc_topics['dominant_topic'].value_counts().sort_index()
+    topic_counts = topic_counts_raw.reindex(range(num_topics), fill_value=0)
+
+    max_count = int(topic_counts.max())
+    total = int(topic_counts.sum())
 
     fig, ax = plt.subplots(figsize=(12, 7))
 
     colors = []
     for count in topic_counts.values:
-        if count == max_count:
-            colors.append('#2ecc71')  # Highlight predominant in green
+        if count == max_count and max_count > 0:
+            colors.append('#2ecc71')  # predominant
         else:
             colors.append(plt.colormaps[color_palette](0.6))
 
-    bars = ax.bar(topic_counts.index, topic_counts.values, color=colors,
-                  edgecolor='black', linewidth=2, alpha=0.8)
+    x = np.arange(num_topics)
+    ax.bar(x, topic_counts.values, color=colors, edgecolor='black', linewidth=2, alpha=0.8)
+
+    ax.set_xticks(x)
+    ax.set_xticklabels([str(i) for i in range(num_topics)])
 
     ax.set_xlabel('Topic ID', fontsize=13, fontweight='bold')
     ax.set_ylabel('Number of Documents', fontsize=13, fontweight='bold')
-    ax.set_title(f'LDA {prefix}: Document Predominance Across ALL Topics (K={len(topic_counts)})',
+    ax.set_title(f'LDA {prefix}: Document Predominance Across ALL Topics (K={num_topics})',
                  fontsize=15, fontweight='bold')
     ax.grid(axis='y', alpha=0.3)
 
-    for i, (topic_id, count) in enumerate(zip(topic_counts.index, topic_counts.values)):
-        pct = (count / topic_counts.sum()) * 100
+    # headroom for labels
+    ax.set_ylim(0, max_count * 1.18 if max_count > 0 else 1)
+
+    for i, count in enumerate(topic_counts.values):
+        pct = (count / total) * 100 if total > 0 else 0
         label = f'{count}\n({pct:.1f}%)'
-        if count == max_count:
-            label += '\n★'  # Star for predominant
-        ax.text(i, count + max_count * 0.02, label,
-                ha='center', va='bottom', fontsize=10, fontweight='bold')
+        if count == max_count and max_count > 0:
+            label += '\n★'
+
+        ax.text(
+            i,
+            count + (max_count * 0.03 if max_count > 0 else 0.1),
+            label,
+            ha='center',
+            va='bottom',
+            fontsize=10,
+            fontweight='bold',
+            bbox=dict(facecolor='white', alpha=0.85, edgecolor='none', pad=2)
+        )
 
     plt.tight_layout()
 
@@ -732,13 +742,14 @@ def visualize_bertopic_all_topics_predominance(save_fig=True):
         Matplotlib figure object.
     """
     topic_info = load_bertopic_topic_info()
+    doc_topics = load_bertopic_doc_topics()
 
     # Separate outliers from regular topics
     regular_topics = topic_info[topic_info['Topic'] != -1].copy()
     outliers = topic_info[topic_info['Topic'] == -1].copy()
 
     max_count = regular_topics['Count'].max()
-    total_docs = topic_info['Count'].sum()
+    total_docs = len(doc_topics)
 
     fig, ax = plt.subplots(figsize=(14, 8))
 
@@ -976,13 +987,11 @@ def run_visualization_pipeline(use_llm_labels=False, generate_english=False):
         print(f"BERTopic interactive plots{lang_label}...")
         visualize_bertopic_interactive_all(language=lang)
 
-    # Static visualizations (only when generating unlabeled - files 06, 08)
-    if None in languages:
-        print("\n[STATIC] Generating Static Visualizations...")
-        print("-" * 80)
-        visualize_lda_all_topics_predominance(model_type='bow')
-        visualize_lda_all_topics_predominance(model_type='tfidf')
-        visualize_bertopic_all_topics_predominance()
+    print("\n[STATIC] Generating Static Predominance Charts (always)...")
+    print("-" * 80)
+    visualize_lda_all_topics_predominance(model_type='bow')
+    visualize_lda_all_topics_predominance(model_type='tfidf')
+    visualize_bertopic_all_topics_predominance()
 
     print("\n" + "=" * 80)
     results_msg = f"✓ COMPLETE! Visualizations saved to: {RESULTS_DIR}"

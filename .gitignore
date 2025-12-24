@@ -2,8 +2,10 @@
 .venv
 .idea/
 __pycache__/
-data/
-data/raw/.ipynb_checkpoints/
+data/cleaned
+data/vectorized
+data/topic_models
+data/raw/.ipynb_checkpoints
 notebooks/.ipynb_checkpoints/
 results/
 
