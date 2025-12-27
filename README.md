@@ -13,7 +13,7 @@ This project implements a comprehensive topic modeling pipeline for analyzing Ge
 - **LLM-Generated Topic Labels**: Human-readable topic names using GPT-4o-mini
 - **Bilingual Support**: Generate topic labels in both German (original) and English
 - **Interactive Visualizations**: pyLDAvis for LDA, interactive HTML for BERTopic
-- **Comprehensive Analysis**: Topic distributions, word clouds, and representative documents
+- **Comprehensive Analysis**: Topic distributions and representative documents
 - **Reproducible Pipeline**: Fixed random seeds and orchestrated workflow
 
 ## Setup
@@ -88,13 +88,14 @@ including unstructured text fields (`description`) and structured metadata (`ser
 The dataset extraction is done via the jupyter notebook `notebooks/01_dataset_exploration.ipynb`.
 
 > **Data reproducibility note:**  
-> Do not execute API data acquisition due to inconsistencies in data retrieval. The data utilized for the project is available upon cloning of the repository. 
-For detailed information see **Section (2) Dataset Sampling** in `notebooks/01_dataset_exploration.ipynb`.
+> The API-based data acquisition step should not be re-executed, as repeated queries may return inconsistent sample counts over time.
+> To ensure reproducibility, the dataset used in this project is included in the repository.  
+> For details, see **Section (2) Dataset Sampling** in `notebooks/01_dataset_exploration.ipynb`.
 
 
 ### Running Full Pipeline (Recommended)
 
-Run the complete pipeline using `main.py`, opting for one of the following pipeline variants:
+Run the complete pipeline using the `src.main` module, opting for one of the following pipeline variants:
 
 ```bash
 # Full pipeline with bilingual labels
@@ -225,8 +226,6 @@ Generates human-readable topic names using GPT-4o-mini:
 
 **Outputs**: `data/topic_models/*/german_labeled/` and `*/english_labeled/`
 
-**Cost**: ~$0.10-0.20 per language per model
-
 ### Step 5: Visualization
 
 ```bash
@@ -238,5 +237,6 @@ Creates comprehensive analysis outputs:
 - Interactive HTML visualizations (BERTopic)
 - Word clouds and topic prevalence charts
 - Representative document extracts
+- Static plots are saved as PNG files, while interactive analyses (pyLDAvis and BERTopic visualizations) are exported as HTML files.
 
 **Outputs**: `results/german_labeled/` and `results/english_labeled/`
