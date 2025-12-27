@@ -10,7 +10,7 @@ This project implements a comprehensive topic modeling pipeline for analyzing Ge
 
 - **Dual Topic Modeling**: LDA (Bag-of-Words & TF-IDF) and BERTopic with transformer embeddings
 - **Automated K Selection**: Coherence-based optimization for determining optimal number of topics
-- **LLM-Generated Topic Labels**: Human-readable topic names using GPT-4o-mini
+- **LLM-Generated Topic Labels**: Human-readable topic names using GPT-4o-mini via the OpenAI API
 - **Bilingual Support**: Generate topic labels in both German (original) and English
 - **Interactive Visualizations**: pyLDAvis for LDA, interactive HTML for BERTopic
 - **Comprehensive Analysis**: Topic distributions and representative documents
