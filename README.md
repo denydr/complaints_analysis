@@ -1,24 +1,33 @@
 # Munich Complaints Analysis
 
-Topic modeling and analysis of Munich city complaints using LDA and BERTopic with LLM-generated topic labels.
+Topic modeling and analysis of Munich Open311 complaints using LDA and BERTopic with LLM-generated topic labels.
+
+## Overview
+
+This project implements a comprehensive topic modeling pipeline for analyzing German-language municipal complaints from Munich's Open311 system. It combines traditional probabilistic models (LDA) with modern transformer-based approaches (BERTopic), enhanced with LLM-generated human-readable topic labels.
 
 ## Features
 
 - **Dual Topic Modeling**: LDA (Bag-of-Words & TF-IDF) and BERTopic with transformer embeddings
+- **Automated K Selection**: Coherence-based optimization for determining optimal number of topics
 - **LLM-Generated Topic Labels**: Human-readable topic names using GPT-4o-mini
 - **Bilingual Support**: Generate topic labels in both German (original) and English
 - **Interactive Visualizations**: pyLDAvis for LDA, interactive HTML for BERTopic
 - **Comprehensive Analysis**: Topic distributions, word clouds, and representative documents
+- **Reproducible Pipeline**: Fixed random seeds and orchestrated workflow
 
 ## Setup
 
 ### 1. Clone the repository
 ```bash
-git clone <your-repo-url>
+git clone <https://github.com/denydr/complaints_analysis.git>
 cd complaints_analysis
 ```
+### 2. Install Python
 
-### 2. Create and activate virtual environment
+Download version 3.12.0 and install it.
+
+### 3. Create and activate virtual environment
 ```bash
 python -m venv .venv
 source .venv/bin/activate  # On macOS/Linux
@@ -26,12 +35,12 @@ source .venv/bin/activate  # On macOS/Linux
 .venv\Scripts\activate  # On Windows
 ```
 
-### 3. Install dependencies
+### 4. Install dependencies
 ```bash
 pip install -r requirements.txt
-```
+```  
 
-### 4. Configure API keys
+### 5. Configure API keys
 ```bash
 # Copy the example environment file
 cp .env.example .env
@@ -47,85 +56,187 @@ OPENAI_API_KEY=sk-your-actual-api-key-here
 
 **Important**: Each user needs their own OpenAI API key. The `.env` file is gitignored to prevent accidentally committing secrets. Never commit your actual API key to version control.
 
-### 5. Verify setup
+### 6. Verify setup
 ```bash
 # Check that your API key is loaded
 python -c "from src.config import OPENAI_API_KEY; print('API key configured!' if OPENAI_API_KEY else 'API key missing')"
 ```
 
+## Pipeline Architecture
+
+The topic modeling pipeline consists of 5 sequential steps:
+
+```
+1. Data Cleaning          → Preprocesses raw German complaint texts
+2. Vectorization (LDA)    → Creates BoW and TF-IDF matrices
+3. Topic Modeling         → Trains LDA and/or BERTopic models
+4. LLM Labeling (optional)→ Generates human-readable topic names
+5. Visualization          → Creates interactive charts and analyses
+```
+
+Each step saves artifacts to disk, allowing incremental execution and experimentation.
+
 ## Usage
 
-### Basic Topic Modeling (without LLM labels)
+### Dataset Acquisition
+
+**Selected Dataset:**  *Mach München Besser – Open311 GeoReport v2* dataset, published by the **City of Munich (Landeshauptstadt München)**. It contains anonymized **citizen complaints and issue reports** submitted via the city’s official Open311 API,  
+including unstructured text fields (`description`) and structured metadata (`service_name`, `status`,`requested_datetime`, etc.).
+
+**Source:** https://machmuenchenbesser.de/georeport/v2/requests.json
+
+The dataset extraction is done via the jupyter notebook `notebooks/01_dataset_exploration.ipynb`.
+
+> **Data reproducibility note:**  
+> Do not execute API data acquisition due to inconsistencies in data retrieval. The data utilized for the project is available upon cloning of the repository. 
+For detailed information see **Section (2) Dataset Sampling** in `notebooks/01_dataset_exploration.ipynb`.
+
+
+### Running Full Pipeline (Recommended)
+
+Run the complete pipeline using `main.py`, opting for one of the following pipeline variants:
+
 ```bash
-# Run LDA and BERTopic with standard keyword-based topic names
-python -m src.topic_modeling
-python -m src.visualization
-```
+# Full pipeline with bilingual labels
+python -m src.main --clean --vectorize --train --label --visualize --german --english
+```  
 
-### LLM-Enhanced Topic Modeling (German only)
 ```bash
-# Generate German topic labels using GPT-4o-mini
-python -m src.topic_modeling --use-llm
-python -m src.visualization --german
-```
+# Full pipeline, no LLM labels (faster, no API costs)
+python -m src.main --clean --vectorize --train --visualize
+```  
 
-### Full Bilingual Pipeline (German + English)
 ```bash
-# Generate both German and English topic labels
-python -m src.topic_modeling --use-llm --english
-python -m src.visualization --german --english
+# LDA pipeline (no LLM labels)
+python -m src.main --clean --vectorize --train --models lda --visualize 
+```  
+
+```bash
+# LDA pipeline with bilingual labels
+python -m src.main --clean --vectorize --train --models lda --label --visualize --german --english
+```  
+
+```bash
+# BERTopic pipeline (no LLM labels)
+python -m src.main --clean --vectorize --train --models bertopic --visualize 
+```  
+
+```bash  
+# BERTopic pipeline with bilingual labels
+python -m src.main --clean --train --models bertopic --label --visualize --german --english
+```  
+
+**Key Flags**:
+- **Steps**: `--clean`, `--vectorize`, `--train`, `--label`, `--visualize` (specify which to run)
+- **Models**: `--models {lda,bertopic,all}` (default: `all`)
+- **Languages**: `--german`, `--english` (for LLM labels and visualizations)
+
+*Note*: Steps must be explicitly specified and execute in order.
+
+### Running Step-By-Step Pipeline
+
+Run pipeline steps independently for more control:
+
+```bash
+# Step 1: Clean raw complaint texts
+python -m src.cleaning
+```  
+
+```bash
+# Step 2: Vectorize for LDA (BoW + TF-IDF)
+python -m src.vectorization
+```  
+
+*Note:* As an optional step after cleaning and vectorization, sanity checkups can be executed within `notebooks/02_sanity_checkups.ipynb`. 
+
+```bash
+# Step 3: Train topic models
+python -m src.topic_modeling              # Both LDA and BERTopic
+python -m src.topic_modeling --lda        # LDA only
+python -m src.topic_modeling --bertopic   # BERTopic only
+```  
+
+```bash
+# Step 4: Generate LLM labels (optional)
+python -m src.llm_topic_labeling                  # Both models, both languages
+python -m src.llm_topic_labeling --german-only    # German only (~50% cost)
+python -m src.llm_topic_labeling --lda            # LDA only
+python -m src.llm_topic_labeling --bertopic       # BERTopic only
+```  
+
+```bash
+# Step 5: Create visualizations
+python -m src.visualization --german --english    # Both languages
+python -m src.visualization --german              # German only
+```  
+
+## Pipeline Details
+
+### Step 1: Data Cleaning
+
+```bash
+python -m src.cleaning
 ```
 
-**Note**: Run commands sequentially (topic modeling first, then visualization). The visualization step depends on artifacts created by topic modeling.
+Preprocesses raw German complaint texts into two formats:
+- **LDA**: Lemmatized, stopwords removed, lowercased
+- **BERTopic**: Lightly cleaned, preserves structure
 
-## Project Structure
+**Output**: `data/cleaned/cleaned_lda_berttopic.csv`
 
-```
-complaints_analysis/
-├── data/
-│   ├── raw/                          # Raw complaint data
-│   ├── cleaned/                      # Cleaned datasets
-│   ├── vectorized/                   # Vectorized data for LDA
-│   └── topic_models/
-│       ├── lda/
-│       │   ├── german/              # LDA German labeled artifacts
-│       │   └── english/             # LDA English labeled artifacts
-│       └── bertopic/
-│           ├── german/              # BERTopic German labeled artifacts
-│           └── english/             # BERTopic English labeled artifacts
-├── results/
-│   ├── german/                      # German visualizations
-│   └── english/                     # English visualizations
-├── src/
-│   ├── config.py                    # Configuration and paths
-│   ├── cleaning.py                  # Data cleaning
-│   ├── topic_modeling.py            # LDA and BERTopic training
-│   ├── topic_labeling.py            # LLM-based topic naming
-│   ├── visualization.py             # Visualization generation
-│   └── data_loader.py               # Data loading utilities
-└── notebooks/                       # Jupyter notebooks for exploration
+### Step 2: Vectorization (LDA Only)
+
+```bash
+python -m src.vectorization
 ```
 
-## Output Files
+Creates sparse matrices for LDA training:
+- Bag-of-Words (BoW) matrix
+- TF-IDF matrix
+- Feature vocabularies
 
-### Without LLM Labels (main directories)
-- `results/00_lda_bow_topics.csv` - LDA topic-word distributions
-- `results/06_bertopic_all_topics.csv` - BERTopic topic information
-- And other standard outputs (files 00-04, 06, 08)
+**Output**: `data/vectorized/lda/*.npz` and `*.joblib` files
 
-### With LLM Labels (language subdirectories)
-- `results/german/05_lda_bow_topics_labeled.csv` - German topic labels
-- `results/german/07_bertopic_all_topics_labeled.csv` - German BERTopic labels
-- `results/english/05_lda_bow_topics_labeled_en.csv` - English topic labels
-- `results/english/07_bertopic_all_topics_labeled_en.csv` - English BERTopic labels
-- Interactive visualizations, word clouds, and analysis files (files 09-14)
+### Step 3: Topic Modeling
 
-## Requirements
+```bash
+python -m src.topic_modeling [--lda] [--bertopic]
+```
 
-- Python 3.8+
-- OpenAI API key (for LLM-based topic labeling)
-- See `requirements.txt` for full dependency list
+Trains topic models with automatic optimization:
+- **LDA**: Coherence-based K selection (BoW and TF-IDF variants)
+- **BERTopic**: HDBSCAN clustering with multilingual embeddings
 
-## License
+**Outputs**:
+- Models: `data/topic_models/{lda,bertopic}/`
+- Topics: `*_topics.csv`
+- Metadata: `*_info.joblib`, `*_k_sweep.csv`
 
-[Your License Here]
+### Step 4: LLM Labeling (Optional)
+
+```bash
+python -m src.llm_topic_labeling [--lda] [--bertopic] [--german-only]
+```
+
+Generates human-readable topic names using GPT-4o-mini:
+- Analyzes keywords + representative documents
+- Creates German labels
+- Translates to English (unless `--german-only`)
+
+**Outputs**: `data/topic_models/*/german_labeled/` and `*/english_labeled/`
+
+**Cost**: ~$0.10-0.20 per language per model
+
+### Step 5: Visualization
+
+```bash
+python -m src.visualization [--german] [--english]
+```
+
+Creates comprehensive analysis outputs:
+- CSV reports with topic distributions
+- Interactive HTML visualizations (BERTopic)
+- Word clouds and topic prevalence charts
+- Representative document extracts
+
+**Outputs**: `results/german_labeled/` and `results/english_labeled/`

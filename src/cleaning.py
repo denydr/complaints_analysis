@@ -44,12 +44,6 @@ Cleaning Strategies:
     transformer-based embeddings (used in BERTopic) can exploit
     the contextual information.
 
-Programmatic Usage:
--------------------
-    from cleaning import preprocess_and_save_cleaned_complaints
-
-    df_clean = preprocess_and_save_cleaned_complaints()
-
 Command-Line Usage:
 -------------------
 From the project root (with `src/` as a package):
@@ -63,7 +57,6 @@ This will:
 """
 
 import re
-from typing import Optional  # currently not used, but fine to keep for later
 
 import pandas as pd
 import spacy

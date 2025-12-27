@@ -2,20 +2,105 @@
 data_loader.py
 --------------
 
-Functions for loading complaints data from disk into pandas DataFrames.
+Data loading utilities for Munich Open311 complaints topic modeling pipeline.
 
-Currently supports:
-- Loading the raw complaints CSV from data/raw/.
-- Loading the cleaned complaints CSV from data/cleaned/ for downstream steps
-  (vectorization and topic modeling).
+This module provides unified loaders for all data artifacts produced by the
+topic modeling workflow. It handles loading raw data, cleaned texts, vectorized
+matrices, trained models, and labeled topics.
+
+Data Sources
+------------
+Raw Data:
+  - data/raw/munich_open311_2020-01-01_to_2025-12-01.csv (original complaint descriptions)
+
+Cleaned Data:
+  - data/cleaned/cleaned_lda_berttopic.csv (LDA + BERTopic cleaned texts)
+
+Vectorized Data (LDA only):
+  - data/vectorized/lda/lda_bow_matrix.npz (BoW sparse matrix)
+  - data/vectorized/lda/lda_tfidf_matrix.npz (TF-IDF sparse matrix)
+  - data/vectorized/lda/lda_bow_feature_names.joblib (BoW vocabulary)
+  - data/vectorized/lda/lda_tfidf_feature_names.joblib (TF-IDF vocabulary)
+
+Topic Models:
+  - data/topic_models/lda/ (trained LDA models, topic tables, doc-topics)
+  - data/topic_models/bertopic/ (trained BERTopic model, topic info)
+
+Labeled Topics (LLM-generated):
+  - data/topic_models/lda/german_labeled/ (German topic labels)
+  - data/topic_models/lda/english_labeled/ (English topic labels)
+  - data/topic_models/bertopic/german_labeled/ (German topic labels)
+  - data/topic_models/bertopic/english_labeled/ (English topic labels)
+
+Loader Functions
+----------------
+Raw & Cleaned Data:
+  - load_raw_complaints()
+  - load_cleaned_complaints()
+  - load_cleaned_for_lda()
+  - load_cleaned_for_bertopic()
+
+Vectorized Artifacts (LDA):
+  - load_lda_vectorized_artifacts()
+  - load_lda_bow()
+  - load_lda_tfidf()
+
+LDA Topic Models:
+  - load_lda_bow_model()
+  - load_lda_bow_topics()
+  - load_lda_bow_doc_topics()
+  - load_lda_bow_info()
+  - load_lda_bow_k_sweep()
+  - load_lda_tfidf_model()
+  - load_lda_tfidf_topics()
+  - load_lda_tfidf_doc_topics()
+  - load_lda_tfidf_info()
+  - load_lda_tfidf_k_sweep()
+
+BERTopic Models:
+  - load_bertopic_model()
+  - load_bertopic_topic_info()
+  - load_bertopic_doc_topics()
+
+Labeled Topics:
+  - load_lda_labeled_topics()
+  - load_lda_labeled_doc_topics()
+  - load_bertopic_labeled_topics()
+  - load_bertopic_labeled_doc_topics()
+  - load_bertopic_model_labeled()
+
+Usage
+-----
+Load raw data:
+    from src.data_loader import load_raw_complaints
+    df = load_raw_complaints()
+
+Load cleaned data for LDA:
+    from src.data_loader import load_cleaned_for_lda
+    df = load_cleaned_for_lda(keep_id=True)
+
+Load vectorized artifacts:
+    from src.data_loader import load_lda_vectorized_artifacts
+    artifacts = load_lda_vectorized_artifacts()
+    X_bow = artifacts["X_bow"]
+    vocab = artifacts["bow_vocab"]
+
+Load trained models:
+    from src.data_loader import load_lda_bow_model, load_bertopic_model
+    lda = load_lda_bow_model()
+    bertopic = load_bertopic_model()
+
+Load labeled topics:
+    from src.data_loader import load_lda_labeled_topics
+    topics_df = load_lda_labeled_topics(model_type='bow', language='de')
 
 Notes
 -----
-- LDA vectorization must use ONLY the 'lda_description' column from the cleaned file.
-- BERTopic uses 'bertopic_description' directly (no vectorization required).
-- Topic modeling later may load either:
-  - cleaned text (for BERTopic), or
-  - vectorized matrices + vocab (for LDA).
+- All loaders raise FileNotFoundError if required files are missing
+- Loaders validate data alignment (e.g., X_bow rows == X_tfidf rows)
+- Language-specific loaders support both 'de' (German) and 'en' (English)
+- LDA vectorization uses only 'lda_description' column from cleaned file
+- BERTopic uses 'bertopic_description' directly (no external vectorization)
 """
 
 from pathlib import Path
@@ -86,7 +171,6 @@ def load_raw_complaints(path: Optional[Path] = None) -> pd.DataFrame:
 
     df = pd.read_csv(csv_path)
 
-    # Expect at least a description column, optionally an ID
     required_cols = ["description"]
     missing = [c for c in required_cols if c not in df.columns]
     if missing:
@@ -95,7 +179,6 @@ def load_raw_complaints(path: Optional[Path] = None) -> pd.DataFrame:
             f"Columns found: {list(df.columns)}"
         )
 
-    # Optionally, ensure descriptions are strings
     df["description"] = df["description"].fillna("").astype(str)
 
     return df

@@ -14,13 +14,13 @@ This module implements three primary objectives:
 
 Outputs
 -------
-- **Standard visualizations** (saved to `results/`):
+- Standard visualizations (saved to `results/`):
     - Files 00-04, 06, 08: Always generated (comparison metrics, topic balance, etc.)
     - Uses keyword-based topic names from model outputs
 
-- **LLM-labeled visualizations** (saved to language-specific subdirectories):
+- LLM-labeled visualizations (saved to language-specific subdirectories):
     - `results/german/`: Files 05, 07, 09-14 with German LLM-generated topic names
-    - `results/english/`: Files 05, 07, 09-14 with English LLM-generated topic names
+    - `results/english/`: Files 05, 07, 10-14 with English LLM-generated topic names
     - Uses human-readable topic labels from `topic_labeling.py`
 
 
@@ -55,17 +55,18 @@ File Mapping
 - 06: LDA predominance charts (main results/)
 - 07: BERTopic topic info with labels (language-specific)
 - 08: BERTopic predominance chart (main results/)
-- 09: pyLDAvis interactive LDA visualization (language-specific)
+- 09: pyLDAvis interactive LDA visualization (german-only)
 - 10-14: BERTopic interactive visualizations (language-specific)
 """
 
+import argparse
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from pathlib import Path
+from matplotlib.patches import Patch
 
-# LDA interactive visualization
 import pyLDAvis
 import pyLDAvis.gensim_models as gensimvis
 from gensim import matutils
@@ -93,7 +94,7 @@ from src.data_loader import (
     load_bertopic_doc_topics,
     load_bertopic_model,
     load_lda_vectorized_artifacts,
-    # Labeled topic loaders
+    load_cleaned_for_bertopic,
     load_lda_labeled_topics,
     load_lda_labeled_doc_topics,
     load_bertopic_labeled_topics,
@@ -790,7 +791,6 @@ def visualize_bertopic_all_topics_predominance(save_fig=True):
                 ha='center', va='bottom', fontsize=9, fontweight='bold')
 
     # Legend
-    from matplotlib.patches import Patch
     legend_elements = [
         Patch(facecolor='#2ecc71', edgecolor='black', label='Predominant Topic'),
         Patch(facecolor='#3498db', edgecolor='black', label='Regular Topics'),
@@ -842,7 +842,6 @@ def visualize_bertopic_interactive_all(save_html=True, language=None):
         doc_topics = load_bertopic_doc_topics()
 
     # Load original documents for some visualizations
-    from src.data_loader import load_cleaned_for_bertopic
     df_bertopic = load_cleaned_for_bertopic()
     docs = df_bertopic['bertopic_description'].tolist()
 
@@ -1004,7 +1003,6 @@ def run_visualization_pipeline(use_llm_labels=False, generate_english=False):
 
 
 if __name__ == "__main__":
-    import argparse
     parser = argparse.ArgumentParser(description="Generate topic modeling visualizations")
     parser.add_argument("--german", action="store_true", help="Generate German labeled visualizations")
     parser.add_argument("--english", action="store_true", help="Generate English labeled visualizations")

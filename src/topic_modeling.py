@@ -46,7 +46,8 @@ How to Run
     python -m src.topic_modeling
 
 2) Run ONLY LDA (BoW + TF-IDF)
-To run only the LDA pipelines:
+
+    python -m src.topic_modeling --lda
 
 This will:
 - Train LDA on BoW
@@ -55,7 +56,6 @@ This will:
 - Skip BERTopic entirely
 
 3) Run ONLY BERTopic
-To run only the BERTopic pipeline:
 
     python -m src.topic_modeling --bertopic
 
