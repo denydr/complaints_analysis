@@ -4,12 +4,19 @@ Topic modeling and analysis of Munich Open311 complaints using LDA and BERTopic 
 
 ## Overview
 
-This project implements a comprehensive topic modeling pipeline for analyzing German-language municipal complaints from Munich's Open311 system. It combines traditional probabilistic models (LDA) with modern transformer-based approaches (BERTopic), enhanced with LLM-generated human-readable topic labels.
+This project implements a comprehensive topic modeling pipeline for analyzing German-language municipal complaints and 
+identifying prevalent topics within Munich's Open311 system. It combines traditional probabilistic models (LDA) with modern
+transformer-based approaches (BERTopic), enhanced by LLM-generated, human-readable topic labels.
+
+> **Note on topic label variability:**  
+> Although random seeds are fixed to ensure reproducibility of topic assignments,  
+> LLM-generated topic labels may vary slightly between pipeline runs.  
+> These variations are purely linguistic; the underlying topic structure and semantic meaning remain unchanged.
 
 ## Features
 
 - **Dual Topic Modeling**: LDA (Bag-of-Words & TF-IDF) and BERTopic with transformer embeddings
-- **Automated K Selection**: Coherence-based optimization for determining optimal number of topics
+- **Automated K Selection**: Coherence-based optimization for determining optimal number of topics for LDA
 - **LLM-Generated Topic Labels**: Human-readable topic names using GPT-4o-mini via the OpenAI API
 - **Bilingual Support**: Generate topic labels in both German (original) and English
 - **Interactive Visualizations**: pyLDAvis for LDA, interactive HTML for BERTopic

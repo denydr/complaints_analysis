@@ -446,12 +446,30 @@ def _save_bertopic_labeled_artifacts_with_keywords(
 
             if translate_keywords and language == 'en' and topic_id in translated_keywords_dict:
                 english_words = translated_keywords_dict[topic_id]
-                if len(english_words) == len(keywords_with_scores):
+                expected_len = len(keywords_with_scores)
+                actual_len = len(english_words)
+
+                if actual_len == expected_len:
+                    # Perfect match - use all translated keywords
                     new_topic_representations[topic_id] = [
                         (eng_word, score) for eng_word, (_, score) in zip(english_words, keywords_with_scores)
                     ]
+                elif actual_len > expected_len:
+                    # More translated keywords than expected - truncate to match
+                    print(f"    ⚠ Topic {topic_id}: LLM returned {actual_len} keywords, expected {expected_len}. Truncating.")
+                    new_topic_representations[topic_id] = [
+                        (english_words[i], score) for i, (_, score) in enumerate(keywords_with_scores)
+                    ]
                 else:
-                    new_topic_representations[topic_id] = keywords_with_scores
+                    # Fewer translated keywords than expected - pad with German keywords
+                    print(f"    ⚠ Topic {topic_id}: LLM returned {actual_len} keywords, expected {expected_len}. Padding with German.")
+                    mixed_keywords = []
+                    for i, (german_word, score) in enumerate(keywords_with_scores):
+                        if i < actual_len:
+                            mixed_keywords.append((english_words[i], score))
+                        else:
+                            mixed_keywords.append((german_word, score))
+                    new_topic_representations[topic_id] = mixed_keywords
             else:
                 new_topic_representations[topic_id] = keywords_with_scores
 
