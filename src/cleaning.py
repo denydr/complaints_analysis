@@ -26,7 +26,7 @@ Cleaning Strategies:
 --------------------
 - LDA:
   - Strong normalization and noise removal.
-  - Removes URLs, emails, punctuation, emojis, HTML-like artifacts,
+  - Removes URLs, emails, punctuation, HTML-like artifacts,
     and non-alphanumeric symbols.
   - Uses spaCy (German model) for tokenization and lemmatization.
   - Removes German stopwords and very short tokens.
@@ -99,7 +99,7 @@ def clean_for_lda(text: str, lowercase: bool = True) -> str:
     Chronology:
     1) Punctuation & special character removal (plus URLs/emails).
        - Uses a regex to keep only digits, letters (incl. German umlauts and ß),
-         and spaces; drops emojis, HTML-like tags, and other symbols.
+         and spaces; drops HTML-like tags, and other symbols.
     2) spaCy (German) for tokenization, stopword removal, lemmatization.
 
     Parameters
@@ -177,7 +177,7 @@ def clean_for_bertopic(text: str, lowercase: bool = True) -> str:
     -----
     1) Remove URLs and emails using shared regexes.
     2) Keep only digits, letters (incl. German umlauts and ß) and spaces:
-       -> This removes emojis, HTML tags like `<p>`, `<br>`, brackets, and
+       -> This removes HTML tags like `<p>`, `<br>`, brackets, and
           other non-alphanumeric symbols.
     3) Normalize whitespace.
     4) Optional lowercasing.
@@ -205,7 +205,7 @@ def clean_for_bertopic(text: str, lowercase: bool = True) -> str:
     text = EMAIL_PATTERN.sub(" ", text)
 
     # 2) Reuse LDA's regex: keep digits, letters (incl. umlauts, ß) and spaces.
-    #    This also removes emojis, <p>, <br>, and other non-alphanumeric junk.
+    #    This also removes <p>, <br>, and other non-alphanumeric junk.
     text = re.sub(r"[^0-9A-Za-zÄÖÜäöüß ]+", " ", text)
 
     # 3) Normalize whitespace
