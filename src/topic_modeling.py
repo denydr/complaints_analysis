@@ -505,11 +505,32 @@ def run_lda_pipelines(
     doc_ids = artifacts.get("doc_ids", None)
 
     texts = artifacts.get("texts", None)
+
+    meta = artifacts.get("meta", None)
+    if meta is None:
+        raise ValueError(
+            "Missing LDA vectorization meta. Re-run vectorization.py to generate LDA_VECTORIZATION_META_FILE."
+        )
+
     if texts is None:
         raise ValueError(
             "Missing LDA_PROCESSED_TEXT_FILE. Re-run vectorization.py with saving enabled."
         )
-    texts_tokens = [t.split() for t in texts]
+    # Build the SAME analyzer used in vectorization.py (for coherence tokenization)
+    analyzer_vec = CountVectorizer(
+        lowercase=meta["lowercase"],
+        token_pattern=meta["token_pattern"],
+        ngram_range=tuple(meta["ngram_range"]),
+        # min_df/max_df are NOT used by the analyzer; they only affect vocab pruning during fit.
+        # We keep them out here intentionally.
+    )
+    analyzer = analyzer_vec.build_analyzer()
+
+    # Tokenize consistently with the original vectorizer settings
+    texts_tokens = [analyzer(t) for t in texts]
+
+    if all(len(toks) == 0 for toks in texts_tokens):
+        raise ValueError("All tokenized documents are empty. Check vectorization meta settings.")
 
     # -------------------------
     # Auto-select K (topics)

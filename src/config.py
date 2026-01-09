@@ -76,6 +76,10 @@ LDA_DOC_IDS_FILE = LDA_VECTORIZED_DIR / "lda_doc_ids.npy"
 # Stored as a list of strings via joblib.dump()
 LDA_PROCESSED_TEXT_FILE = LDA_VECTORIZED_DIR / "lda_processed_texts.joblib"
 
+# Vectorizer meta (settings needed to rebuild the exact analyzer later)
+# Stored as joblib dict: lowercase, token_pattern, ngram_range, min_df, max_df
+LDA_VECTORIZATION_META_FILE = LDA_VECTORIZED_DIR / "lda_vectorization_meta.joblib"
+
 # ============================================================
 # Topic Modeling Output Paths
 # ============================================================

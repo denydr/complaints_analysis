@@ -120,6 +120,7 @@ from src.config import (
     LDA_TFIDF_FEATURE_NAMES_FILE,
     LDA_DOC_IDS_FILE,
     LDA_PROCESSED_TEXT_FILE,
+    LDA_VECTORIZATION_META_FILE,
     # LDA topic model artifact paths
     LDA_BOW_MODEL_FILE,
     LDA_BOW_TOPICS_FILE,
@@ -368,6 +369,10 @@ def load_lda_vectorized_artifacts():
     if LDA_PROCESSED_TEXT_FILE.exists():
         texts = joblib.load(LDA_PROCESSED_TEXT_FILE)
 
+    meta = None
+    if LDA_VECTORIZATION_META_FILE.exists():
+        meta = joblib.load(LDA_VECTORIZATION_META_FILE)
+
     # -------------------------
     # Sanity checks (alignment)
     # -------------------------
@@ -388,6 +393,12 @@ def load_lda_vectorized_artifacts():
             f"texts length {len(texts)} != X_bow rows {n_docs}"
         )
 
+    if meta is not None:
+        required_keys = {"lowercase", "token_pattern", "ngram_range", "min_df", "max_df"}
+        missing = required_keys - set(meta.keys())
+        if missing:
+            raise ValueError(f"LDA vectorization meta is missing keys: {sorted(missing)}")
+
     return {
         "X_bow": X_bow,
         "X_tfidf": X_tfidf,
@@ -395,6 +406,7 @@ def load_lda_vectorized_artifacts():
         "tfidf_vocab": tfidf_vocab,
         "doc_ids": doc_ids,
         "texts": texts,
+        "meta": meta,
     }
 
 def load_lda_bow():

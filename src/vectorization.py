@@ -48,6 +48,7 @@ from src.config import (
     LDA_TFIDF_FEATURE_NAMES_FILE,
     LDA_DOC_IDS_FILE,
     LDA_PROCESSED_TEXT_FILE,
+    LDA_VECTORIZATION_META_FILE
 )
 from src.data_loader import load_cleaned_for_lda
 
@@ -57,7 +58,7 @@ def vectorize_for_lda_and_save(
     keep_id: bool = True,
     min_df: int = 2,
     max_df: float = 0.85,
-    ngram_range: tuple = (1, 1),
+    ngram_range: tuple = (1, 2),
 ) -> None:
     """
     Vectorize the cleaned LDA texts with two techniques (BoW + TF-IDF),
@@ -74,7 +75,7 @@ def vectorize_for_lda_and_save(
     max_df : float
         Ignore terms that appear in more than max_df fraction of documents.
     ngram_range : tuple
-        Use unigrams (1,1) by default. Can test (1,2) later if needed.
+        Use bigrams (1,2) - yielding better results that unigrams
     """
     # 1) Load cleaned LDA texts (and optional IDs)
     df = load_cleaned_for_lda(id_column=id_column, keep_id=keep_id)
@@ -94,6 +95,16 @@ def vectorize_for_lda_and_save(
     # - lowercase=False because lda_description is already lowercased in cleaning
     # - token_pattern allows German umlauts/ß + digits  (punctuation is already cleaned)
     token_pattern = r"(?u)\b\w+\b"
+
+    # Persist vectorizer settings so topic_modeling can rebuild the same analyzer
+    meta = {
+        "lowercase": False,
+        "token_pattern": token_pattern,
+        "ngram_range": tuple(ngram_range),
+        "min_df": int(min_df),
+        "max_df": float(max_df),
+    }
+    joblib.dump(meta, LDA_VECTORIZATION_META_FILE)
 
     bow_vectorizer = CountVectorizer(
         lowercase=False,
@@ -162,6 +173,8 @@ def vectorize_for_lda_and_save(
 
     print(f"Saved processed texts to:{LDA_PROCESSED_TEXT_FILE}")
 
+    print(f"Saved LDA vectorization meta to: {LDA_VECTORIZATION_META_FILE}")
+    print(f"ngram_range used: {meta['ngram_range']}")
 
 if __name__ == "__main__":
     # Allows: python -m src.vectorization
