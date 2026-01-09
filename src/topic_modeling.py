@@ -168,7 +168,7 @@ def _save_doc_topic_distributions(
     None
         Writes a CSV with columns:
         - doc_index
-        - doc_id (if provided)
+        - doc_id
         - topic_0 ... topic_{k-1}
         - dominant_topic
     """
@@ -333,8 +333,7 @@ def _select_best_k_by_coherence(
     """
     Sweep K (num_topics) and select the best model by c_v coherence.
 
-    This function is used to automatically choose the number of topics for LDA.
-    It is intentionally lightweight:
+    This function is used to automatically choose the number of topics for LDA:
     - trains temporary LDA models for each K
     - computes c_v coherence
     - saves a sweep table (CSV)
@@ -589,43 +588,38 @@ def run_bertopic_pipeline(
 
     Implements unsupervised topic discovery using transformer-based sentence
     embeddings (paraphrase-multilingual-MiniLM-L12-v2), UMAP dimensionality
-    reduction, and HDBSCAN density-based clustering. Optimized for small-to-
-    medium datasets (N ≈ 900 documents).
+    reduction, and HDBSCAN density-based clustering.
 
     The function:
-    - Generates semantic embeddings using SentenceTransformers
-    - Reduces dimensionality via UMAP (n_neighbors, n_components, min_dist)
-    - Clusters documents using HDBSCAN (min_cluster_size, min_samples)
-    - Extracts topic representations using class-based TF-IDF (c-TF-IDF)
-    - Reduces outliers via threshold-based embedding similarity (threshold=0.6)
-    - Optionally reduces topics via hierarchical merging (nr_topics)
-    - Saves trained model, topic summaries, and document assignments
+    - Generates semantic document embeddings using SentenceTransformers
+    - Reduces embedding dimensionality via UMAP
+    - Clusters documents using HDBSCAN
+    - Derives topic representations using class-based TF-IDF (c-TF-IDF)
+    - Optionally reassigns outlier documents post hoc based on embedding similarity (cosine similarity threshold = 0.6)
+    - Optionally merges semantically similar topics after initial discovery via the `nr_topics` parameter
+    - Saves the trained model, topic summaries, and per-document topic assignments
 
-    Hyperparameter choices balance topic granularity and coverage for datasets
-    with imbalanced category distributions (e.g., 60% street lighting complaints).
-    Default settings discover 6-8 natural clusters with initial ~15-20% outliers,
-    reduced to ~5-10% after threshold-based reassignment. Original c-TF-IDF topic
-    representations are preserved (no model retraining after outlier reduction).
-
-    Parameters
+  Parameters
     ----------
     min_topic_size : int, default=40
-        Minimum documents required to form a topic (HDBSCAN min_cluster_size).
-        For N ≈ 900 documents, min_topic_size=40 (4.3% of data) allows smaller
-        categories to emerge while preventing micro-cluster fragmentation.
+        Minimum number of documents required to form a topic
+        (HDBSCAN min_cluster_size). This parameter controls the
+        minimum semantic mass needed for a cluster to be retained
+        as a topic.
     nr_topics : int, str, or None, default=None
-        Post-hoc topic reduction strategy:
-        - None: Preserve all natural HDBSCAN clusters (recommended).
-        - int: Merge to approximately this many topics via hierarchical clustering.
-        - "auto": Automatically determine merge threshold based on similarity.
+        Optional post-hoc topic reduction setting. If None, all
+        clusters discovered by HDBSCAN are retained. If set to an
+        integer or "auto", semantically similar topics may be
+        merged after initial topic discovery.
     n_neighbors : int, default=30
-        UMAP neighborhood size. Controls local vs. global structure balance.
-        Lower values (5-15) preserve local patterns; higher values (50+) emphasize
-        global structure. For N ≈ 900 documents, n_neighbors=30 is optimal.
+        Number of neighboring points considered during UMAP
+        dimensionality reduction. This parameter influences the
+        balance between local and global structure in the embedding
+        space.
     min_samples : int, default=1
-        HDBSCAN outlier sensitivity. Lower values (1-3) reduce outliers; higher
-        values (5-10) increase cluster density but exclude more documents.
-        For small datasets, min_samples=1 maximizes topic assignment coverage.
+        HDBSCAN parameter controlling how strictly documents are
+        classified as noise. Lower values assign more documents
+        to topics, while higher values increase outlier sensitivity.
 
     Returns
     -------
@@ -669,7 +663,7 @@ def run_bertopic_pipeline(
 
     vectorizer_model = CountVectorizer(
         stop_words=stopwords,
-        min_df=2,  # Reduced from 5 to capture more representative terms
+        min_df=2,   # Minimum document frequency for c-TF-IDF topic representations
         ngram_range=(1, 2),
     )
 

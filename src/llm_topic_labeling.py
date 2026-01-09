@@ -70,12 +70,6 @@ Prerequisites
 - Set OPENAI_API_KEY environment variable (in .env file)
 - Install python-dotenv and openai packages
 
-Cost Estimate
--------------
-- LDA (5-7 topics): ~$0.05-0.10 per language
-- BERTopic (6-8 topics): ~$0.05-0.10 per language
-- Total (both models, bilingual): ~$0.20-0.40
-
 Notes
 -----
 - Labels are generated based on top keywords + representative documents
@@ -652,7 +646,7 @@ def label_bertopic_model(generate_english: bool = False) -> None:
         delay_in_seconds=0.5,
         chat=True,
         prompt=TOPIC_LABELING_PROMPT_DE,
-        nr_docs=LLM_NUM_REPRESENTATIVE_DOCS,  # Send 6 representative docs to LLM (increased from default 4)
+        nr_docs=LLM_NUM_REPRESENTATIVE_DOCS,  # Send 6 representative docs to LLM
         doc_length=400,  # Limit each doc to 400 chars to reduce noise and focus on core complaint
         tokenizer="char",  # Truncate by character count (required when doc_length is specified)
     )

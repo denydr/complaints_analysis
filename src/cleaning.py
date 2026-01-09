@@ -34,7 +34,7 @@ Cleaning Strategies:
     bag-of-words models like LDA.
 
 - BERTopic:
-  - Reuses the same robust regex-based noise removal as LDA for
+  - Reuses the same regex-based noise removal as LDA for
     URLs/emails/special characters, but:
       * No spaCy lemmatization.
       * No stopword removal.
