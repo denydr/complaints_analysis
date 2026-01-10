@@ -676,10 +676,11 @@ def run_bertopic_pipeline(
 
         # Common fillers & abbreviations
         "etc", "usw",  # und so weiter
-        "mfg", "vg",   # mit freundlichen grüßen, viele grüße
+        "mfg", "vg",  # mit freundlichen grüßen, viele grüße
+        "bzw",  # beziehungsweise
 
         # Address artifacts
-        "str", "straße", "strasse", "nr",
+        "str", "straße", "strasse", "nr", "hausnummer"
     ]
 
     vectorizer_model = CountVectorizer(
