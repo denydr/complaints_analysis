@@ -29,6 +29,7 @@ Cleaning Strategies:
   - Removes URLs, emails, punctuation, HTML-like artifacts,
     and non-alphanumeric symbols.
   - Uses spaCy (German model) for tokenization and lemmatization.
+  - Lowercasing the text
   - Removes German stopwords and very short tokens.
   - Produces a space-separated string of lemmas, optimized for
     bag-of-words models like LDA.
