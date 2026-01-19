@@ -155,7 +155,7 @@ python -m src.cleaning
 python -m src.vectorization
 ```  
 
-*Note:* As an optional step after cleaning and vectorization, sanity checkups can be executed within `notebooks/02_sanity_checkups.ipynb`. 
+*Note:* As an optional step after cleaning and vectorization, sanity checkups can be executed within `03_sanity_checkups_cleaning_bigram-vectorization.ipynb`. 
 
 ```bash
 # Step 3: Train topic models
